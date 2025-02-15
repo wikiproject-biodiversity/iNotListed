@@ -52,13 +52,13 @@ jobs:
       - name: Run the script
         run: |
           if [[ -n "$USERNAME" ]]; then
-            python script.py user "$USERNAME"
+            python iNotWiki.py user "$USERNAME"
             REPORT_FILE="suggestions/missing_wikipedia_user_${USERNAME}.md"
           elif [[ -n "$PROJECT_ID" ]]; then
-            python script.py project "$PROJECT_ID"
+            python iNotWiki.py project "$PROJECT_ID"
             REPORT_FILE="suggestions/missing_wikipedia_project_${PROJECT_ID}.md"
           elif [[ -n "$COUNTRY_CODE" ]]; then
-            python script.py country "$COUNTRY_CODE"
+            python iNotWiki.py country "$COUNTRY_CODE"
             REPORT_FILE="suggestions/missing_wikipedia_country_${COUNTRY_CODE}.md"
           else
             echo "No valid parameters found in the issue. Exiting..."
