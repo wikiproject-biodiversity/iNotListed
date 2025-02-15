@@ -52,13 +52,13 @@ jobs:
       - name: Run the script
         run: |
           if [[ -n "$taxon_id" ]]; then
-            python script.py taxon "$taxon_id"
+            python iNotWiki.py taxon "$taxon_id"
           elif [[ -n "$username" ]]; then
-            python script.py user "$username"
+            python iNotWiki.py user "$username"
           elif [[ -n "$country_code" ]]; then
-            python script.py country "$country_code"
+            python iNotWiki.py country "$country_code"
           elif [[ -n "$project_id" ]]; then
-            python script.py project "$project_id"
+            python iNotWiki.py project "$project_id"
           else
             echo "No valid parameters found in the issue. Exiting..."
             exit 1
