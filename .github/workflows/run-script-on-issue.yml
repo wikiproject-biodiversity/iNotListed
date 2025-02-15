@@ -28,22 +28,22 @@ jobs:
           echo "Extracting issue details..."
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
-      
-          # Extract values by handling Markdown formatting
+
+          # Extract values
           USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
           PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
           COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
-      
+
           # Ignore "_No response_" values
           if [[ "$USERNAME" == "_No response_" ]]; then USERNAME=""; fi
           if [[ "$PROJECT_ID" == "_No response_" ]]; then PROJECT_ID=""; fi
           if [[ "$COUNTRY_CODE" == "_No response_" ]]; then COUNTRY_CODE=""; fi
-      
+
           # Debug output
           echo "Extracted Username: $USERNAME"
           echo "Extracted Project ID: $PROJECT_ID"
           echo "Extracted Country Code: $COUNTRY_CODE"
-      
+
           # Set GitHub Actions environment variables
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
@@ -51,21 +51,35 @@ jobs:
 
       - name: Run the script
         run: |
-          if [[ -n "$taxon_id" ]]; then
-            python iNotWiki.py taxon "$taxon_id"
-          elif [[ -n "$username" ]]; then
-            python iNotWiki.py user "$username"
-          elif [[ -n "$country_code" ]]; then
-            python iNotWiki.py country "$country_code"
-          elif [[ -n "$project_id" ]]; then
-            python iNotWiki.py project "$project_id"
+          if [[ -n "$USERNAME" ]]; then
+            python script.py user "$USERNAME"
+            REPORT_FILE="suggestions/missing_wikipedia_user_${USERNAME}.md"
+          elif [[ -n "$PROJECT_ID" ]]; then
+            python script.py project "$PROJECT_ID"
+            REPORT_FILE="suggestions/missing_wikipedia_project_${PROJECT_ID}.md"
+          elif [[ -n "$COUNTRY_CODE" ]]; then
+            python script.py country "$COUNTRY_CODE"
+            REPORT_FILE="suggestions/missing_wikipedia_country_${COUNTRY_CODE}.md"
           else
             echo "No valid parameters found in the issue. Exiting..."
             exit 1
           fi
 
-      - name: Upload generated markdown report
-        uses: actions/upload-artifact@v4
-        with:
-          name: missing-wikipedia-report
-          path: suggestions/
+          echo "report_file=$REPORT_FILE" >> $GITHUB_ENV
+
+      - name: Read Markdown File and Post Comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "$REPORT_FILE" ]; then
+            # Read and escape Markdown content
+            COMMENT_BODY=$(cat "$REPORT_FILE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+
+            # Post the comment
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+              -d "{\"body\": \"$COMMENT_BODY\"}"
+          else
+            echo "❌ No report file found. Skipping comment."
+          fi
