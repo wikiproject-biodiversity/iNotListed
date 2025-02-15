@@ -51,18 +51,27 @@ jobs:
 
       - name: Run the script
         run: |
-          if [[ -n "$taxon_id" ]]; then
-            python iNotWiki.py taxon "$taxon_id"
-          elif [[ -n "$username" ]]; then
+          REPORT_FILE=""
+          
+          if [[ -n "$username" ]]; then
             python iNotWiki.py user "$username"
-          elif [[ -n "$country_code" ]]; then
-            python iNotWiki.py country "$country_code"
+            REPORT_FILE="suggestions/missing_wikipedia_user_${username}.md"
           elif [[ -n "$project_id" ]]; then
             python iNotWiki.py project "$project_id"
+            REPORT_FILE="suggestions/missing_wikipedia_project_${project_id}.md"
+          elif [[ -n "$country_code" ]]; then
+            python iNotWiki.py country "$country_code"
+            REPORT_FILE="suggestions/missing_wikipedia_country_${country_code}.md"
           else
-            echo "No valid parameters found in the issue. Exiting..."
+            echo "❌ No valid parameters found in the issue. Exiting..."
             exit 1
           fi
+          
+          # Debug output
+          echo "Generated report file: $REPORT_FILE"
+          
+          # Store REPORT_FILE for later steps
+          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
