@@ -69,3 +69,20 @@ jobs:
         with:
           name: missing-wikipedia-report
           path: suggestions/
+
+      - name: Read Markdown File and Post Comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "$REPORT_FILE" ]; then
+            # Read and escape Markdown content
+            COMMENT_BODY=$(cat "$REPORT_FILE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+
+            # Post the comment
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+              -d "{\"body\": \"$COMMENT_BODY\"}"
+          else
+            echo "❌ No report file found. Skipping comment."
+          fi
