@@ -1,0 +1,58 @@
+name: 📖 Missing Wikipedia Articles Request
+description: Request a report on taxa missing Wikipedia articles based on an iNaturalist username, project, or country.
+title: "[Missing Wikipedia]: "
+labels: ["report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🌍 Find Missing Wikipedia Articles
+        Submit a request for a list of taxa missing Wikipedia articles based on:
+        - Your **iNaturalist username** (fetches your observed taxa)
+        - An **iNaturalist project ID** (fetches taxa from a project)
+        - A **country/place ID** (fetches taxa from a specific region)
+        
+        **You must provide exactly ONE of the following:**
+        
+  - type: input
+    id: username
+    attributes:
+      label: 🔹 iNaturalist Username (optional)
+      description: "Enter your iNaturalist username if you want to search for taxa you've observed."
+      placeholder: "e.g., johndoe123"
+    validations:
+      required: false
+
+  - type: input
+    id: project_id
+    attributes:
+      label: 🔹 iNaturalist Project ID (optional)
+      description: "Enter the iNaturalist project ID to fetch taxa from a project."
+      placeholder: "e.g., 54321"
+    validations:
+      required: false
+
+  - type: input
+    id: country_id
+    attributes:
+      label: 🔹 iNaturalist Country/Place ID (optional)
+      description: "Enter the iNaturalist place ID to fetch taxa from a specific region."
+      placeholder: "e.g., 1234"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ✅ **Make sure you have entered only ONE of the above options.**
+        If multiple fields are filled, only the first valid option will be used.
+  
+  - type: textarea
+    id: additional_info
+    attributes:
+      label: 📝 Additional Information (optional)
+      description: "Add any extra details or specific requirements for your request."
+      placeholder: "Any special instructions or focus areas?"
+    validations:
+      required: false
