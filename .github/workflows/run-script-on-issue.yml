@@ -28,18 +28,26 @@ jobs:
           echo "Extracting issue details..."
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
-
-          # Extract taxon_id, username, country_code, or project_id from issue form
-          TAXON_ID=$(echo "$ISSUE_BODY" | grep -oP 'Taxon ID:\s*\K\d+')
-          USERNAME=$(echo "$ISSUE_BODY" | grep -oP 'Username:\s*\K\S+')
-          COUNTRY_CODE=$(echo "$ISSUE_BODY" | grep -oP 'Country Code:\s*\K\d+')
-          PROJECT_ID=$(echo "$ISSUE_BODY" | grep -oP 'Project ID:\s*\K\S+')
-
+      
+          # Extract values by handling Markdown formatting
+          USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
+          PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
+          COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
+      
+          # Ignore "_No response_" values
+          if [[ "$USERNAME" == "_No response_" ]]; then USERNAME=""; fi
+          if [[ "$PROJECT_ID" == "_No response_" ]]; then PROJECT_ID=""; fi
+          if [[ "$COUNTRY_CODE" == "_No response_" ]]; then COUNTRY_CODE=""; fi
+      
+          # Debug output
+          echo "Extracted Username: $USERNAME"
+          echo "Extracted Project ID: $PROJECT_ID"
+          echo "Extracted Country Code: $COUNTRY_CODE"
+      
           # Set GitHub Actions environment variables
-          echo "taxon_id=$TAXON_ID" >> $GITHUB_ENV
           echo "username=$USERNAME" >> $GITHUB_ENV
-          echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
+          echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
 
       - name: Run the script
         run: |
