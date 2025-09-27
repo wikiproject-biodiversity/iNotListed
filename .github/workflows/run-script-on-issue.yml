@@ -63,7 +63,7 @@ jobs:
             python iNotWiki.py country "$country_code"
             REPORT_FILE="suggestions/missing_wikipedia_country_${country_code}.md"
           else
-            echo "❌ No valid parameters found in the issue. Exiting..."
+            echo "No valid parameters found in the issue. Exiting..."
             exit 1
           fi
           
