@@ -1,4 +1,4 @@
-name: 📖 Missing Wikipedia Articles Request
+name: Missing Wikipedia Articles Request
 description: Request a report on taxa missing Wikipedia articles based on an iNaturalist username, project, or country.
 title: "[Missing Wikipedia]: "
 labels: ["report"]
@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## 🌍 Find Missing Wikipedia Articles
+        ## Find Missing Wikipedia Articles
         Submit a request for a list of taxa missing Wikipedia articles based on:
         - Your **iNaturalist username** (fetches your observed taxa)
         - An **iNaturalist project ID** (fetches taxa from a project)
@@ -17,7 +17,7 @@ body:
   - type: input
     id: username
     attributes:
-      label: 🔹 iNaturalist Username (optional)
+      label: iNaturalist Username (optional)
       description: "Enter your iNaturalist username if you want to search for taxa you've observed."
       placeholder: "e.g., johndoe123"
     validations:
@@ -26,7 +26,7 @@ body:
   - type: input
     id: project_id
     attributes:
-      label: 🔹 iNaturalist Project ID (optional)
+      label: iNaturalist Project ID (optional)
       description: "Enter the iNaturalist project ID to fetch taxa from a project."
       placeholder: "e.g., 54321"
     validations:
@@ -35,17 +35,40 @@ body:
   - type: input
     id: country_id
     attributes:
-      label: 🔹 iNaturalist Country/Place ID (optional)
+      label: iNaturalist Country/Place ID (optional)
       description: "Enter the iNaturalist place ID to fetch taxa from a specific region."
       placeholder: "e.g., 1234"
     validations:
       required: false
 
+  - type: checkboxes
+    id: languages
+    attributes:
+      label: Wikipedia Languages to Include
+      description: "Select the Wikipedia languages you want the report to check."
+      options:
+        - en (English)
+        - es (Spanish)
+        - ja (Japanese)
+        - th (Thai)
+        - id (Indonesian)
+        - cn (Chinese)
+        - de (German)
+        - fr (French)
+        - it (Italian)
+        - ru (Russian)
+        - pt (Portuguese)
+        - ar (Arabic)
+        - ko (Korean)
+        - nl (Dutch)
+    validations:
+      required: true
+
   - type: markdown
     attributes:
       value: |
         ---
-        ✅ **Make sure you have entered only ONE of the above options.**
+        **Make sure you have entered only ONE of the above options.**
         If multiple fields are filled, only the first valid option will be used.
   
   - type: textarea
