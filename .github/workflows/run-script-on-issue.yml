@@ -63,9 +63,11 @@ jobs:
           REPORT_FILE=""
 
           # Convert checkbox output into space-separated language codes
+          # Convert checkbox output into space-separated language codes
           LANG_ARGS=""
           if [[ -n "$languages" ]]; then
-              CLEAN_LANGS=$(echo "$languages" | grep -oP '\[x\]\s*\K[a-z]{2}')
+              # Only pick checked languages: lines starting with '- [x]'
+              CLEAN_LANGS=$(echo "$languages" | grep '^\- \[x\]' | awk '{print $3}' )
               LANG_ARGS="--languages $CLEAN_LANGS"
           fi
 
