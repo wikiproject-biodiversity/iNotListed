@@ -180,7 +180,7 @@ def generate_markdown_report(project_slug, languages=None):
 # --------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="iNaturalist Wikipedia coverage report")
-    parser.add_argument("project_id", help="iNaturalist Project ID")
+    parser.add_argument("project_id", type=str, help="iNaturalist Project ID")
     parser.add_argument("--languages", type=str, help="Comma-separated list of Wikipedia languages")
     args = parser.parse_args()
 
