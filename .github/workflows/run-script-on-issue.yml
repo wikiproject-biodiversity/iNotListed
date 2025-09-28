@@ -57,13 +57,13 @@ jobs:
               echo "$LANGUAGES" >> $GITHUB_ENV
               echo "EOF" >> $GITHUB_ENV
           fi
-
+          
       - name: Run the script
         run: |
           REPORT_FILE=""
 
           # Convert checkbox output into space-separated language codes
-         LANG_ARGS=""
+          LANG_ARGS=""
           if [[ -n "$languages" ]]; then
               # Extract checked languages (e.g., "- [x] es") and join with commas
               CLEAN_LANGS=$(echo "$languages" | grep '^\- \[x\]' | awk '{print $3}' | paste -sd "," -)
