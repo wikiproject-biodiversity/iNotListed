@@ -28,7 +28,7 @@ jobs:
           echo "Extracting issue details..."
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
-      
+
           # Extract values by handling Markdown formatting
           USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
           PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
@@ -43,12 +43,19 @@ jobs:
           echo "Extracted Username: $USERNAME"
           echo "Extracted Project ID: $PROJECT_ID"
           echo "Extracted Country Code: $COUNTRY_CODE"
-          echo "Extracted Languages: $LANGUAGES"
+          echo "Extracted Languages:"
+          echo "$LANGUAGES"
 
+          # Save simple values
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
-          echo "languages=$LANGUAGES" >> $GITHUB_ENV
+
+          # Save multiline languages safely
+          if [[ -n "$LANGUAGES" ]]; then
+              echo "languages<<EOF" >> $GITHUB_ENV
+              echo "$LANGUAGES" >> $GITHUB_ENV
+              echo "EOF" >> $GITHUB_ENV
 
       - name: Run the script
         run: |
@@ -95,4 +102,3 @@ jobs:
               -d "{\"body\": \"$COMMENT_BODY\"}"
           else
             echo "❌ No report file found. Skipping comment."
-          fi
