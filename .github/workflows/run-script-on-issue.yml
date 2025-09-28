@@ -20,23 +20,30 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests tqdm wikidataintegrator matplotlib
+          pip install requests tqdm wikidataintegrator
 
       - name: Parse issue and extract parameters
         id: parse-issue
         run: |
+          echo "Extracting issue details..."
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
-
+      
+          # Extract values by handling Markdown formatting
           USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
           PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
           COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
-          LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
+          LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d' | tr -d '\r')
 
-          [[ "$USERNAME" == "_No response_" ]] && USERNAME=""
-          [[ "$PROJECT_ID" == "_No response_" ]] && PROJECT_ID=""
-          [[ "$COUNTRY_CODE" == "_No response_" ]] && COUNTRY_CODE=""
-          [[ "$LANGUAGES" == "_No response_" ]] && LANGUAGES=""
+          # Ignore "_No response_" values
+          if [[ "$USERNAME" == "_No response_" ]]; then USERNAME=""; fi
+          if [[ "$PROJECT_ID" == "_No response_" ]]; then PROJECT_ID=""; fi
+          if [[ "$COUNTRY_CODE" == "_No response_" ]]; then COUNTRY_CODE=""; fi
+
+          echo "Extracted Username: $USERNAME"
+          echo "Extracted Project ID: $PROJECT_ID"
+          echo "Extracted Country Code: $COUNTRY_CODE"
+          echo "Extracted Languages: $LANGUAGES"
 
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
@@ -46,21 +53,27 @@ jobs:
       - name: Run the script
         run: |
           REPORT_FILE=""
+
+          # Convert checkbox output into space-separated language codes
           LANG_ARGS=""
-          [[ -n "$languages" ]] && LANG_ARGS="--languages \"$languages\""
+          if [[ -n "$languages" ]]; then
+              CLEAN_LANGS=$(echo "$languages" | grep -oP '\[x\]\s*\K[a-z]{2}')
+              LANG_ARGS="--languages $CLEAN_LANGS"
+          fi
 
           if [[ -n "$username" ]]; then
-            python iNotWiki.py user "$username" $LANG_ARGS
-            REPORT_FILE="suggestions/missing_wikipedia_user_${username}.md"
+              python iNotWiki.py user "$username" $LANG_ARGS
+              REPORT_FILE="suggestions/missing_wikipedia_user_${username}.md"
           elif [[ -n "$project_id" ]]; then
-            python iNotWiki.py project "$project_id" $LANG_ARGS
-            REPORT_FILE="suggestions/missing_wikipedia_project_${project_id}.md"
+              python iNotWiki.py project "$project_id" $LANG_ARGS
+              REPORT_FILE="suggestions/missing_wikipedia_project_${project_id}.md"
           elif [[ -n "$country_code" ]]; then
-            python iNotWiki.py country "$country_code" $LANG_ARGS
-            REPORT_FILE="suggestions/missing_wikipedia_country_${country_code}.md"
+              python iNotWiki.py country "$country_code" $LANG_ARGS
+              REPORT_FILE="suggestions/missing_wikipedia_country_${country_code}.md"
           else
-            echo "No valid parameters found in the issue. Exiting..."
-            exit 1
+              echo "No valid parameters found in the issue. Exiting..."
+              exit 1
+          fi
 
           echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
 
@@ -70,7 +83,7 @@ jobs:
           name: missing-wikipedia-report
           path: suggestions/
 
-      - name: Post Markdown Comment
+      - name: Read Markdown File and Post Comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -82,3 +95,4 @@ jobs:
               -d "{\"body\": \"$COMMENT_BODY\"}"
           else
             echo "❌ No report file found. Skipping comment."
+          fi
