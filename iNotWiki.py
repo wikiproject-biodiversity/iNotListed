@@ -101,4 +101,88 @@ def generate_markdown_report(project_slug, languages=None):
     if species_counts:
         sp_labels, sp_values = zip(*species_counts.most_common(10))
         plt.figure(figsize=(8, 5))
-        plt.barh(sp_labels[::-
+        plt.barh(sp_labels[::-1], sp_values[::-1])
+        plt.xlabel("Number of observations")
+        plt.title("Top 10 Most Observed Species")
+        plt.tight_layout()
+        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_species_{project_slug}.png")
+        plt.savefig(plot_path)
+        plt.close()
+        md_lines.append(f"![Top 10 Species]({plot_path})\n")
+
+    if observer_counts:
+        obs_labels, obs_values = zip(*observer_counts.most_common(10))
+        plt.figure(figsize=(8, 5))
+        plt.barh(obs_labels[::-1], obs_values[::-1])
+        plt.xlabel("Number of observations")
+        plt.title("Top 10 Most Active Observers")
+        plt.tight_layout()
+        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_observers_{project_slug}.png")
+        plt.savefig(plot_path)
+        plt.close()
+        md_lines.append(f"![Top 10 Observers]({plot_path})\n")
+
+    # --- Wikipedia/Wikidata Coverage ---
+    if wiki_map:
+        missing_counts = Counter()
+        not_on_wd = 0
+        for tn, langs in wiki_map.items():
+            if not langs["wikidata"]:
+                not_on_wd += 1
+            for lang in langs["missing"]:
+                missing_counts[lang] += 1
+
+        md_lines.append("## Wikipedia & Wikidata Coverage\n")
+        md_lines.append(f"- Species not on Wikidata: **{not_on_wd}**")
+        for lang in languages:
+            md_lines.append(f"- Missing in {lang}: **{missing_counts[lang]}**\n")
+
+        # --- Table ---
+        sorted_species = sorted(
+            wiki_map.items(),
+            key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())
+        )
+
+        header = "| Species | Wikidata | " + " | ".join(languages) + " |\n"
+        header += "|---|---|" + "|".join(["---"] * len(languages)) + "|\n"
+        rows = []
+        totals = {lang: 0 for lang in languages}
+
+        for tn, langs in sorted_species:
+            wd_status = "✅" if langs["wikidata"] else "⚠️"
+            row = [tn, wd_status]
+            for lang in languages:
+                if lang in langs["existing"]:
+                    row.append(f"[✅]({langs['existing'][lang]})")
+                else:
+                    row.append("❌")
+                    totals[lang] += 1
+            rows.append("| " + " | ".join(row) + " |")
+
+        total_row = ["**Totals**", ""]
+        for lang in languages:
+            total_row.append(str(totals[lang]))
+        rows.append("| " + " | ".join(total_row) + " |")
+        md_lines.append("\n".join([header] + rows))
+    else:
+        md_lines.append("All species have Wikipedia articles in selected languages.\n")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = os.path.join(SUGGESTIONS_FOLDER, f"missing_wikipedia_project_{project_slug}_{timestamp}.md")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(md_lines))
+
+    print(f"✅ Markdown report saved at: {report_path}")
+    return report_path
+
+# --------------------------
+# CLI
+# --------------------------
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="iNaturalist Wikipedia coverage report")
+    parser.add_argument("project_id", help="iNaturalist Project ID")
+    parser.add_argument("--languages", type=str, help="Comma-separated list of Wikipedia languages")
+    args = parser.parse_args()
+
+    langs = args.languages.split(",") if args.languages else None
+    generate_markdown_report(args.project_id, languages=langs)
