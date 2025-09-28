@@ -44,23 +44,23 @@ body:
   - type: checkboxes
     id: languages
     attributes:
-      label: Wikipedia Languages to Include
+      label: 🌐 Wikipedia Languages to Include
       description: "Select the Wikipedia languages you want the report to check."
       options:
-        - en (English)
-        - es (Spanish)
-        - ja (Japanese)
-        - th (Thai)
-        - id (Indonesian)
-        - cn (Chinese)
-        - de (German)
-        - fr (French)
-        - it (Italian)
-        - ru (Russian)
-        - pt (Portuguese)
-        - ar (Arabic)
-        - ko (Korean)
-        - nl (Dutch)
+        - label: en (English)
+        - label: es (Spanish)
+        - label: ja (Japanese)
+        - label: th (Thai)
+        - label: id (Indonesian)
+        - label: cn (Chinese)
+        - label: de (German)
+        - label: fr (French)
+        - label: it (Italian)
+        - label: ru (Russian)
+        - label: pt (Portuguese)
+        - label: ar (Arabic)
+        - label: ko (Korean)
+        - label: nl (Dutch)
     validations:
       required: true
 
