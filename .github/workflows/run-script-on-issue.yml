@@ -63,14 +63,13 @@ jobs:
           REPORT_FILE=""
 
           # Convert checkbox output into space-separated language codes
-          # Convert checkbox output into space-separated language codes
           LANG_ARGS=""
           if [[ -n "$languages" ]]; then
-              # Only pick checked languages: lines starting with '- [x]'
-              CLEAN_LANGS=$(echo "$languages" | grep '^\- \[x\]' | awk '{print $3}' )
+              CLEAN_LANGS=$(echo "$languages" | grep '^\- \[x\]' | awk '{print $3}' | tr '\n' ' ')
               LANG_ARGS="--languages $CLEAN_LANGS"
           fi
-
+          
+          # Use only the first non-empty parameter
           if [[ -n "$username" ]]; then
               python iNotWiki.py user "$username" $LANG_ARGS
               REPORT_FILE="suggestions/missing_wikipedia_user_${username}.md"
@@ -81,10 +80,12 @@ jobs:
               python iNotWiki.py country "$country_code" $LANG_ARGS
               REPORT_FILE="suggestions/missing_wikipedia_country_${country_code}.md"
           else
-              echo "No valid parameters found in the issue. Exiting..."
-              exit 1
+              echo "No valid parameters found. Using default project ID..."
+              PROJECT_ID="biohackathon-2025"
+              python iNotWiki.py project "$PROJECT_ID" $LANG_ARGS
+              REPORT_FILE="suggestions/missing_wikipedia_project_${PROJECT_ID}.md"
           fi
-
+          
           echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
