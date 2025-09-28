@@ -56,6 +56,7 @@ jobs:
               echo "languages<<EOF" >> $GITHUB_ENV
               echo "$LANGUAGES" >> $GITHUB_ENV
               echo "EOF" >> $GITHUB_ENV
+          fi
 
       - name: Run the script
         run: |
