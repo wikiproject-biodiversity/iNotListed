@@ -1,222 +1,104 @@
 import argparse
-import json
-import requests
 import os
-import sys
+import requests
+from collections import Counter
+import matplotlib.pyplot as plt
 from datetime import datetime
-from tqdm import tqdm
-import time
 
-# Ensure required dependencies are installed
-try:
-    from wikidataintegrator import wdi_core
-except ImportError:
-    print("Installing missing dependencies...")
-    os.system("pip install wikidataintegrator tqdm")
-    from wikidataintegrator import wdi_core
-
-# Create suggestions folder if it doesn't exist
 SUGGESTIONS_FOLDER = "suggestions"
 os.makedirs(SUGGESTIONS_FOLDER, exist_ok=True)
 
-def safe_request(url, max_retries=5):
-    """Make API requests safely, handling rate limits (HTTP 429)."""
-    retries = 0
-    while retries < max_retries:
-        response = requests.get(url)
+# --------------------------
+# Wikipedia/Wikidata Check
+# --------------------------
+def check_wikipedia_multilang(taxon_names, languages=None):
+    if languages is None:
+        languages = ["en", "es", "ja", "th", "id", "cn", "de", "fr", "it", "ru", "pt", "ar", "ko", "nl"]
 
-        if response.status_code == 200:
-            return response  # ✅ Successful response
+    verified = {}
+    batch_size = 50
 
-        elif response.status_code == 429:  # Too many requests
-            retry_after = int(response.headers.get("Retry-After", 20))  # Default: wait 10 sec
-            print(f"⚠️ Rate limit reached! Waiting {retry_after} seconds before retrying...")
-            time.sleep(retry_after)
-            retries += 1  # Count the retry
+    for tn in taxon_names:
+        verified[tn] = {"missing": languages[:], "existing": {}, "wikidata": False}
 
-        else:
-            print(f"❌ Error fetching {url}: HTTP {response.status_code}")
-            return None  # Stop on other errors
+    lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
 
-    print("❌ Max retries reached. Skipping this request.")
-    return None  # Skip if too many failures
+    for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
+        names = " ".join(f'"{w}"' for w in chunks)
+        query = f"""
+        SELECT DISTINCT ?taxon_name ?lang ?article
+        WHERE {{
+            VALUES ?taxon_name {{ {names} }}
+            VALUES (?lang ?wiki) {{ {lang_values} }}
+            ?item wdt:P225 ?taxon_name .
+            OPTIONAL {{
+                ?article schema:about ?item ;
+                         schema:isPartOf ?wiki .
+            }}
+        }}
+        """
+        url = "https://query.wikidata.org/sparql"
+        r = requests.get(url, params={"format": "json", "query": query})
+        if not r.ok:
+            continue
 
-def fetch_missing_wikipedia_articles(base_url, args):
-    """Fetch all pages of taxa from iNaturalist that are missing Wikipedia articles."""
-    temp_results = []
-    page = 1
-    total_results = None
+        results = r.json()["results"]["bindings"]
+        for res in results:
+            tn = res["taxon_name"]["value"]
+            lang = res["lang"]["value"]
+            article = res.get("article", {}).get("value")
 
-    print(f"Fetching data from iNaturalist: {base_url}")
-    seen = []
-    with tqdm(desc="Fetching iNaturalist pages", unit="page") as progress_bar:
-        while True:
-            url = f"{base_url}&page={page}"
-            response = safe_request(url)
+            verified[tn]["wikidata"] = True
+            if article:
+                verified[tn]["existing"][lang] = article
+                if lang in verified[tn]["missing"]:
+                    verified[tn]["missing"].remove(lang)
 
-            if response.status_code != 200:
-                print(f"Error fetching page {page}: {response.status_code}")
-                break
+    return verified
 
-            photos = response.json()
+# --------------------------
+# Fetch Taxon Names from iNaturalist
+# --------------------------
+def fetch_taxon_names_from_project(project_id):
+    url = f"https://api.inaturalist.org/v1/observations?project_id={project_id}&per_page=200"
+    response = requests.get(url)
+    data = response.json()
 
-            if total_results is None:
-                total_results = photos.get("total_results", 0)
-                progress_bar.total = (total_results // 200) + 1
+    taxon_names = []
+    species = []
+    observers = []
+    all_obs = []
 
-            for obs in photos.get("results", []):
-                if len(obs["taxon"]["name"].split(" ")) == 2 and obs["taxon"]["wikipedia_url"] is None:
-                    if obs["taxon"]["name"] not in seen:
-                        seen.append(obs["taxon"]["name"])
-                        temp_results.append({
-                            "inat_obs_id": obs["id"],
-                            "inat_taxon_id": obs["taxon"]["id"],
-                            "taxon_name": obs["taxon"]["name"],
-                        })
+    for obs in data.get("results", []):
+        if "taxon" in obs and obs["taxon"]:
+            name = obs["taxon"]["name"]
+            taxon_names.append(name)
+            species.append(name)
+            observers.append(obs.get("user", {}).get("login", "Unknown"))
+            all_obs.append(obs)
 
-            progress_bar.update(1)
+    return list(set(taxon_names)), species, observers, all_obs
 
-            if "results" not in photos or len(photos["results"]) < 200:
-                break
+# --------------------------
+# Generate Markdown Report
+# --------------------------
+def generate_markdown_report(project_slug, languages=None):
+    if languages is None:
+        languages = ["en", "es", "ja", "th", "id"]
 
-            page += 1
+    taxon_names, species, observers, all_obs = fetch_taxon_names_from_project(project_slug)
+    species_counts = Counter(species)
+    observer_counts = Counter(observers)
+    wiki_map = check_wikipedia_multilang(taxon_names, languages)
 
-    print(f"Total taxa fetched: "+str(page*200))
+    md_lines = []
+    md_lines.append(f"# iNaturalist Project Report: {project_slug}\n")
+    md_lines.append(f"- Total observations: {len(all_obs)}")
+    md_lines.append(f"- Unique species observed: {len(set(species))}")
+    md_lines.append(f"- Unique observers: {len(set(observers))}\n")
 
-    return temp_results
-
-
-def generate_markdown_report(missing_wikipedia_articles, search_type, search_value, args):
-    """Generate a Markdown report with an index and multiple images per species."""
-
-    # Define the filename dynamically based on search type
-    filename = f"missing_wikipedia_{search_type}_{search_value}.md"
-    report_path = os.path.join(SUGGESTIONS_FOLDER, filename)
-
-    markdown_content = f"# 📖 Missing Wikipedia Articles Report ({search_type}: {search_value})\n\n"
-
-    # Create an index at the top
-    markdown_content += "## 📌 Index\n\n"
-
-    for taxon in missing_wikipedia_articles:
-        taxon_name = taxon["taxon_name"]
-        markdown_content += f"- [{taxon_name}](#{taxon_name.replace(' ', '-').lower()})\n"
-
-    markdown_content += "\n---\n\n"
-
-    for taxon in missing_wikipedia_articles:
-        taxon_name = taxon["taxon_name"]
-        inat_id = taxon["inat_taxon_id"]
-
-        markdown_content += f"## 🦠 {taxon_name}\n\n"
-        markdown_content += f"🔗 **iNaturalist Page**: [View on iNaturalist](https://www.inaturalist.org/taxa/{inat_id})\n\n"
-
-        # Fetch iNaturalist observations for the species
-        # Fetch iNaturalist observations for the species
-        obs_url = f"https://api.inaturalist.org/v1/observations?taxon_id={inat_id}&quality_grade=research&per_page=200"
-        if hasattr(args, "username"):
-            obs_url += f"&user_id={args.username}"
-        if hasattr(args, "country_code"):
-            obs_url += f"&place_id={args.country_code}"
-        if hasattr(args, "project_id"):
-            obs_url += f"&project_id={args.project_id}"
-        print(obs_url)
-        obs_response = safe_request(obs_url)
-
-        images = []
-        if obs_response:
-            obs_data = obs_response.json()
-            for obs in obs_data.get("results", []):
-                if "photos" in obs and obs["photos"]:
-                    for photo in obs["photos"]:
-                        if "url" in photo:
-                            images.append({
-                                "url": photo.get("medium_url", photo["url"]),  # ✅ Fallback to another URL
-                                "attribution": photo.get("attribution", "Unknown")
-                            })
-
-        # Add all images found
-        if images:
-            for img in images:
-                markdown_content += f"![{taxon_name}]({img['url']})\n\n"
-                markdown_content += f"📷 *Image credit*: {img['attribution']}\n\n"
-        else:
-            markdown_content += "❌ *No images available from observations.*\n\n"
-
-        # Add BHL Reference
-        bhl_url = f"https://www.biodiversitylibrary.org/name/{taxon_name.replace(' ', '_')}"
-        markdown_content += f"### 📚 Biodiversity Heritage Library (BHL)\n"
-        markdown_content += f"🔗 **BHL Page**: [View on BHL]({bhl_url})\n\n"
-
-        # Add Wikimedia Commons
-        commons_page = f"https://commons.wikimedia.org/wiki/Category:{taxon_name.replace(' ', '_')}"
-        markdown_content += f"### 🖼 Wikimedia Commons\n"
-        markdown_content += f"🔗 **Commons Category**: [View on Commons]({commons_page})\n\n"
-
-        markdown_content += "---\n\n"
-
-    # Save the Markdown file
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(markdown_content)
-
-    print(f"✅ Markdown report saved in: {report_path}")
-
-    # Save the Markdown file
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(markdown_content)
-
-    print(f"✅ Markdown report saved in: {report_path}")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Find missing Wikipedia articles for taxa.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # Taxon command
-    taxon_parser = subparsers.add_parser("taxon", help="Search by taxon ID")
-    taxon_parser.add_argument("taxon_id", type=int, help="iNaturalist Taxon ID")
-
-    # User command
-    user_parser = subparsers.add_parser("user", help="Search by user")
-    user_parser.add_argument("username", help="iNaturalist Username")
-    user_parser.add_argument("--wikipedia", default="https://en.wikipedia.org/", help="Wikipedia language version")
-
-    # Country command
-    country_parser = subparsers.add_parser("country", help="Search by country")
-    country_parser.add_argument("country_code", type=int, help="iNaturalist Country Code")
-
-    # Project command
-    project_parser = subparsers.add_parser("project", help="Search by project")
-    project_parser.add_argument("project_id", help="iNaturalist Project ID")
-    project_parser.add_argument("--wikipedia", default="https://en.wikipedia.org/", help="Wikipedia language version")
-
-    args = parser.parse_args()
-
-    base_url = None
-    search_type = None
-    search_value = None  # ✅ Define these before using them
-
-    if args.command == "taxon":
-        base_url = f"https://api.inaturalist.org/v1/observations?taxon_id={args.taxon_id}&quality_grade=research&per_page=200"
-        search_type = "taxon"
-        search_value = args.taxon_id
-    elif args.command == "user":
-        base_url = f"https://api.inaturalist.org/v1/observations?user_id={args.username}&quality_grade=research&per_page=200"
-        search_type = "user"
-        search_value = args.username
-    elif args.command == "country":
-        base_url = f"https://api.inaturalist.org/v1/observations?place_id={args.country_code}&quality_grade=research&per_page=200"
-        search_type = "country"
-        search_value = args.country_code
-    elif args.command == "project":
-        base_url = f"https://api.inaturalist.org/v1/observations?project_id={args.project_id}&quality_grade=research&per_page=200"
-        search_type = "project"
-        search_value = args.project_id
-
-    if base_url:
-        results = fetch_missing_wikipedia_articles(base_url, args)
-        if results:
-            generate_markdown_report(results, search_type, search_value, args)  # ✅ Now properly defined!
-
-if __name__ == "__main__":
-    main()
+    # --- Plots ---
+    if species_counts:
+        sp_labels, sp_values = zip(*species_counts.most_common(10))
+        plt.figure(figsize=(8, 5))
+        plt.barh(sp_labels[::-
