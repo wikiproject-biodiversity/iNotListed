@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests tqdm wikidataintegrator
+          pip install requests tqdm wikidataintegrator matplotlib
 
       - name: Parse issue and extract parameters
         id: parse-issue
