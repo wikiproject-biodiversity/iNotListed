@@ -31,7 +31,6 @@ jobs:
           COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | xargs)
           LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d')
 
-          # Save environment variables
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
@@ -41,15 +40,35 @@ jobs:
           fi
 
       - name: Run the script
+        id: run-script
         run: |
-          python iNotWiki.py \
+          OUTPUT=$(python iNotWiki.py \
             --username "$username" \
             --project_id "$project_id" \
             --country_id "$country_code" \
-            --languages "$languages"
+            --languages "$languages")
+
+          echo "$OUTPUT"
+
+          REPORT_FILE=$(echo "$OUTPUT" | grep "REPORT_PATH::" | cut -d"::" -f2)
+          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
         with:
           name: missing-wikipedia-report
           path: suggestions/
+
+      - name: Post report as issue comment
+        if: env.REPORT_FILE != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "$REPORT_FILE" ]; then
+            COMMENT_BODY=$(cat "$REPORT_FILE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+              -d "{\"body\": \"$COMMENT_BODY\"}"
+          else
+            echo "❌ No report file found. Skipping comment."
