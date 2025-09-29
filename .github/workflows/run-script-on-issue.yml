@@ -2,13 +2,11 @@ name: Run Script on Issue Form Submission
 
 on:
   issues:
-    types:
-      - opened
+    types: [opened]
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,90 +18,38 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests tqdm wikidataintegrator matplotlib
+          pip install requests tqdm matplotlib
 
       - name: Parse issue and extract parameters
         id: parse-issue
         run: |
-          echo "Extracting issue details..."
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
 
-          # Extract values by handling Markdown formatting
-          USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
-          PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
-          COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | tr -d '\r' | xargs)
-          LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d' | tr -d '\r')
+          USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | xargs)
+          PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | xargs)
+          COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | xargs)
+          LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d')
 
-          # Ignore "_No response_" values
-          if [[ "$USERNAME" == "_No response_" ]]; then USERNAME=""; fi
-          if [[ "$PROJECT_ID" == "_No response_" ]]; then PROJECT_ID=""; fi
-          if [[ "$COUNTRY_CODE" == "_No response_" ]]; then COUNTRY_CODE=""; fi
-
-          echo "Extracted Username: $USERNAME"
-          echo "Extracted Project ID: $PROJECT_ID"
-          echo "Extracted Country Code: $COUNTRY_CODE"
-          echo "Extracted Languages:"
-          echo "$LANGUAGES"
-
-          # Save simple values
+          # Save environment variables
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
-
-          # Save multiline languages safely
           if [[ -n "$LANGUAGES" ]]; then
-              echo "languages<<EOF" >> $GITHUB_ENV
-              echo "$LANGUAGES" >> $GITHUB_ENV
-              echo "EOF" >> $GITHUB_ENV
+              CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
+              echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
           fi
-          
+
       - name: Run the script
         run: |
-          REPORT_FILE=""
-
-          # Convert checkbox output into space-separated language codes
-          LANG_ARGS=""
-          if [[ -n "$languages" ]]; then
-              # Extract checked languages (e.g., "- [x] es") and join with commas
-              CLEAN_LANGS=$(echo "$languages" | grep '^\- \[x\]' | awk '{print $3}' | paste -sd "," -)
-              LANG_ARGS="--languages $CLEAN_LANGS"
-          fi
-          
-          # Use only the first non-empty parameter
-          if [[ -n "$username" ]]; then
-              python iNotWiki.py user "$username" $LANG_ARGS
-              REPORT_FILE="suggestions/missing_wikipedia_user_${username}.md"
-          elif [[ -n "$project_id" ]]; then
-              python iNotWiki.py project "$project_id" $LANG_ARGS
-              REPORT_FILE="suggestions/missing_wikipedia_project_${project_id}.md"
-          elif [[ -n "$country_code" ]]; then
-              python iNotWiki.py country "$country_code" $LANG_ARGS
-              REPORT_FILE="suggestions/missing_wikipedia_country_${country_code}.md"
-          else
-              echo "No valid parameters found. Using default project ID..."
-              PROJECT_ID="biohackathon-2025"
-              python iNotWiki.py project "$PROJECT_ID" $LANG_ARGS
-              REPORT_FILE="suggestions/missing_wikipedia_project_${PROJECT_ID}.md"
-          fi
-          
-          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
+          python iNotWiki.py \
+            --username "$username" \
+            --project_id "$project_id" \
+            --country_id "$country_code" \
+            --languages "$languages"
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
         with:
           name: missing-wikipedia-report
           path: suggestions/
-
-      - name: Read Markdown File and Post Comment
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -f "$REPORT_FILE" ]; then
-            COMMENT_BODY=$(cat "$REPORT_FILE" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-              -d "{\"body\": \"$COMMENT_BODY\"}"
-          else
-            echo "❌ No report file found. Skipping comment."
