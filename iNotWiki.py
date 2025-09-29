@@ -59,8 +59,16 @@ def check_wikipedia_multilang(taxon_names, languages=None):
 # --------------------------
 # Fetch Taxon Names from iNaturalist
 # --------------------------
-def fetch_taxon_names_from_project(project_id):
-    url = f"https://api.inaturalist.org/v1/observations?project_id={project_id}&per_page=200"
+def fetch_taxon_names(search_type, search_value):
+    if search_type == "project":
+        url = f"https://api.inaturalist.org/v1/observations?project_id={search_value}&per_page=200"
+    elif search_type == "user":
+        url = f"https://api.inaturalist.org/v1/observations?user_id={search_value}&per_page=200"
+    elif search_type == "country":
+        url = f"https://api.inaturalist.org/v1/observations?place_id={search_value}&per_page=200"
+    else:
+        raise ValueError("Invalid search_type")
+
     response = requests.get(url)
     data = response.json()
 
@@ -86,13 +94,13 @@ def generate_markdown_report(search_value, search_type="project", languages=None
     if languages is None:
         languages = ["en", "es", "ja", "th", "id"]
 
-    taxon_names, species, observers, all_obs = fetch_taxon_names_from_project(project_slug)
+    taxon_names, species, observers, all_obs = fetch_taxon_names(search_type, search_value)
     species_counts = Counter(species)
     observer_counts = Counter(observers)
     wiki_map = check_wikipedia_multilang(taxon_names, languages)
 
     md_lines = []
-    md_lines.append(f"# iNaturalist Project Report: {project_slug}\n")
+    md_lines.append(f"# iNaturalist {search_type.capitalize()} Report: {search_value}\n")
     md_lines.append(f"- Total observations: {len(all_obs)}")
     md_lines.append(f"- Unique species observed: {len(set(species))}")
     md_lines.append(f"- Unique observers: {len(set(observers))}\n")
@@ -105,7 +113,7 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         plt.xlabel("Number of observations")
         plt.title("Top 10 Most Observed Species")
         plt.tight_layout()
-        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_species_{project_slug}.png")
+        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_species_{search_value}.png")
         plt.savefig(plot_path)
         plt.close()
         md_lines.append(f"![Top 10 Species]({plot_path})\n")
@@ -117,7 +125,7 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         plt.xlabel("Number of observations")
         plt.title("Top 10 Most Active Observers")
         plt.tight_layout()
-        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_observers_{project_slug}.png")
+        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_observers_{search_value}.png")
         plt.savefig(plot_path)
         plt.close()
         md_lines.append(f"![Top 10 Observers]({plot_path})\n")
@@ -168,7 +176,7 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         md_lines.append("All species have Wikipedia articles in selected languages.\n")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = os.path.join(SUGGESTIONS_FOLDER, f"missing_wikipedia_project_{project_slug}_{timestamp}.md")
+    report_path = os.path.join(SUGGESTIONS_FOLDER, f"missing_wikipedia_{search_type}_{search_value}_{timestamp}.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 
