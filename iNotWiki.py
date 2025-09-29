@@ -180,9 +180,20 @@ def generate_markdown_report(project_slug, languages=None):
 # --------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="iNaturalist Wikipedia coverage report")
-    parser.add_argument("project_id", type=str, help="iNaturalist Project ID")
+    parser.add_argument("--project_id", type=str, help="iNaturalist Project ID")
+    parser.add_argument("--username", type=str, help="iNaturalist Username")
+    parser.add_argument("--country_id", type=str, help="iNaturalist Country/Place ID")
     parser.add_argument("--languages", type=str, help="Comma-separated list of Wikipedia languages")
     args = parser.parse_args()
 
     langs = args.languages.split(",") if args.languages else None
-    generate_markdown_report(args.project_id, languages=langs)
+
+    if args.username:
+        generate_markdown_report(args.username, search_type="user", languages=langs)
+    elif args.project_id:
+        generate_markdown_report(args.project_id, search_type="project", languages=langs)
+    elif args.country_id:
+        generate_markdown_report(args.country_id, search_type="country", languages=langs)
+    else:
+        DEFAULT_PROJECT_ID = "biohackathon-2025"
+        generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs)
