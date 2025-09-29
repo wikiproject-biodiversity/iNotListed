@@ -82,7 +82,7 @@ def fetch_taxon_names_from_project(project_id):
 # --------------------------
 # Generate Markdown Report
 # --------------------------
-def generate_markdown_report(project_slug, languages=None):
+def generate_markdown_report(search_value, search_type="project", languages=None):
     if languages is None:
         languages = ["en", "es", "ja", "th", "id"]
 
