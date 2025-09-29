@@ -47,20 +47,34 @@ body:
       label: 🌐 Wikipedia Languages to Include
       description: "Select the Wikipedia languages you want the report to check."
       options:
-        - label: en (English)
-        - label: es (Spanish)
-        - label: ja (Japanese)
-        - label: th (Thai)
-        - label: id (Indonesian)
-        - label: cn (Chinese)
-        - label: de (German)
-        - label: fr (French)
-        - label: it (Italian)
-        - label: ru (Russian)
-        - label: pt (Portuguese)
-        - label: ar (Arabic)
-        - label: ko (Korean)
-        - label: nl (Dutch)
+        - label: en
+          id: en
+        - label: es
+          id: es
+        - label: ja
+          id: ja
+        - label: th
+          id: th
+        - label: id
+          id: id
+        - label: cn
+          id: cn
+        - label: de
+          id: de
+        - label: fr
+          id: fr
+        - label: it
+          id: it
+        - label: ru
+          id: ru
+        - label: pt
+          id: pt
+        - label: ar
+          id: ar
+        - label: ko
+          id: ko
+        - label: nl
+          id: nl
     validations:
       required: true
 
