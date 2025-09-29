@@ -205,3 +205,4 @@ if __name__ == "__main__":
     else:
         DEFAULT_PROJECT_ID = "biohackathon-2025"
         generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs)
+    print(f"REPORT_PATH::{report_path}")
