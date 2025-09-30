@@ -56,7 +56,9 @@ jobs:
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           fi
 
-          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
+          echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
+          echo "$REPORT_PATH" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
