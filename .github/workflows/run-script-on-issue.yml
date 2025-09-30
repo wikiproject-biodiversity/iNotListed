@@ -60,6 +60,7 @@ jobs:
           # echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
           # echo "$REPORT_PATH" >> $GITHUB_ENV
           # echo "EOF" >> $GITHUB_ENV
+          echo "REPORT_PATH=$(printf '%q' "$REPORT_PATH")"
           echo "REPORT_PATH=$(printf '%q' "$REPORT_PATH")" >> $GITHUB_ENV
           echo "✅ Generated report: $REPORT_PATH"
 
