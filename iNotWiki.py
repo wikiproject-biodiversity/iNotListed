@@ -20,7 +20,7 @@ def check_wikipedia_multilang(taxon_names, languages=None):
 
     # lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
     lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
-    print(
+    print(lang_values)
 
     for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
         names = " ".join(f'"{w}"' for w in chunks)
