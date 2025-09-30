@@ -35,7 +35,6 @@ def check_wikipedia_multilang(taxon_names, languages=None):
             }}
         }}
         """
-        print(query)
         url = "https://query.wikidata.org/sparql"
         r = requests.get(url, params={"format": "json", "query": query})
         if not r.ok:
