@@ -5,15 +5,12 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-SUGGESTIONS_FOLDER = "suggestions"
-os.makedirs(SUGGESTIONS_FOLDER, exist_ok=True)
-
 # --------------------------
 # Wikipedia/Wikidata Check
 # --------------------------
 def check_wikipedia_multilang(taxon_names, languages=None):
     if languages is None:
-        languages = ["en", "es", "ja", "nl"]
+        languages = ["en", "es", "ja", "th", "id", "cn", "de", "fr", "it", "ru", "pt", "ar", "ko", "nl"]
 
     verified = {}
     batch_size = 50
@@ -90,14 +87,17 @@ def fetch_taxon_names(search_type, search_value):
 # --------------------------
 # Generate Markdown Report
 # --------------------------
-def generate_markdown_report(search_value, search_type="project", languages=None):
+def generate_markdown_report(search_value, search_type="project", languages=None, output_folder="reports"):
     if languages is None:
-        languages = ["en", "es", "ja", "th", "id"]
+        languages = ["en", "es", "ja"]
 
     taxon_names, species, observers, all_obs = fetch_taxon_names(search_type, search_value)
     species_counts = Counter(species)
     observer_counts = Counter(observers)
     wiki_map = check_wikipedia_multilang(taxon_names, languages)
+
+    issue_folder = os.path.join(output_folder, f"issue-{search_value}")
+    os.makedirs(issue_folder, exist_ok=True)
 
     md_lines = []
     md_lines.append(f"# iNaturalist {search_type.capitalize()} Report: {search_value}\n")
@@ -113,7 +113,7 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         plt.xlabel("Number of observations")
         plt.title("Top 10 Most Observed Species")
         plt.tight_layout()
-        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_species_{search_value}.png")
+        plot_path = os.path.join(issue_folder, f"top_species_{search_value}.png")
         plt.savefig(plot_path)
         plt.close()
         md_lines.append(f"![Top 10 Species]({plot_path})\n")
@@ -125,7 +125,7 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         plt.xlabel("Number of observations")
         plt.title("Top 10 Most Active Observers")
         plt.tight_layout()
-        plot_path = os.path.join(SUGGESTIONS_FOLDER, f"top_observers_{search_value}.png")
+        plot_path = os.path.join(issue_folder, f"top_observers_{search_value}.png")
         plt.savefig(plot_path)
         plt.close()
         md_lines.append(f"![Top 10 Observers]({plot_path})\n")
@@ -145,18 +145,12 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         for lang in languages:
             md_lines.append(f"- Missing in {lang}: **{missing_counts[lang]}**\n")
 
-        # --- Table ---
-        sorted_species = sorted(
-            wiki_map.items(),
-            key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())
-        )
-
         header = "| Species | Wikidata | " + " | ".join(languages) + " |\n"
         header += "|---|---|" + "|".join(["---"] * len(languages)) + "|\n"
         rows = []
         totals = {lang: 0 for lang in languages}
 
-        for tn, langs in sorted_species:
+        for tn, langs in sorted(wiki_map.items(), key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())):
             wd_status = "✅" if langs["wikidata"] else "⚠️"
             row = [tn, wd_status]
             for lang in languages:
@@ -176,11 +170,11 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         md_lines.append("All species have Wikipedia articles in selected languages.\n")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = os.path.join(SUGGESTIONS_FOLDER, f"missing_wikipedia_{search_type}_{search_value}_{timestamp}.md")
+    report_path = os.path.join(issue_folder, f"missing_wikipedia_{search_type}_{search_value}_{timestamp}.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 
-    print(report_path)
+    print(f"✅ Markdown report saved at: {report_path}")
     return report_path
 
 # --------------------------
@@ -192,20 +186,20 @@ if __name__ == "__main__":
     parser.add_argument("--username", type=str, help="iNaturalist Username")
     parser.add_argument("--country_id", type=str, help="iNaturalist Country/Place ID")
     parser.add_argument("--languages", type=str, help="Comma-separated list of Wikipedia languages")
+    parser.add_argument("--output-folder", type=str, default="reports", help="Folder to store reports")
     args = parser.parse_args()
 
     langs = args.languages.split(",") if args.languages else None
+    output_folder = args.output_folder
 
-    # Capture report_path in every case
     if args.username:
-        report_path = generate_markdown_report(args.username, search_type="user", languages=langs)
+        report_path = generate_markdown_report(args.username, search_type="user", languages=langs, output_folder=output_folder)
     elif args.project_id:
-        report_path = generate_markdown_report(args.project_id, search_type="project", languages=langs)
+        report_path = generate_markdown_report(args.project_id, search_type="project", languages=langs, output_folder=output_folder)
     elif args.country_id:
-        report_path = generate_markdown_report(args.country_id, search_type="country", languages=langs)
+        report_path = generate_markdown_report(args.country_id, search_type="country", languages=langs, output_folder=output_folder)
     else:
         DEFAULT_PROJECT_ID = "biohackathon-2025"
-        report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs)
+        report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs, output_folder=output_folder)
 
-    # Print the path for GitHub Actions
     print(report_path)
