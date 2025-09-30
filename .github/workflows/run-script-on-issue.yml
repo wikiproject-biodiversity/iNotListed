@@ -5,7 +5,8 @@ on:
     types: [opened]
 
 jobs:
-  run-script:
+  run-project-only:
+    if: contains(github.event.issue.title, '[Wikiblitz]')
     runs-on: ubuntu-latest
 
     steps:
