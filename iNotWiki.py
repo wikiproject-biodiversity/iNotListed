@@ -208,4 +208,4 @@ if __name__ == "__main__":
         report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs)
 
     # Print the path for GitHub Actions
-    print(f"REPORT_PATH::{report_path}")
+    print(report_path)
