@@ -37,7 +37,7 @@ jobs:
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
 
           if [[ -n "$LANGUAGES" ]]; then
-              CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
+              CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $NF}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
           fi
 
