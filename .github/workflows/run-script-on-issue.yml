@@ -39,7 +39,6 @@ jobs:
           if [[ -n "$LANGUAGES" ]]; then
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
-              echo "languages=$CLEAN_LANGS"
           fi
 
       - name: Run iNotWiki.py and capture report path
