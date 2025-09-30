@@ -146,8 +146,8 @@ def generate_markdown_report(search_value, search_type="project", languages=None
             md_lines.append(f"- Missing in {lang}: **{missing_counts[lang]}**\n")
 
         # Table header uses language codes explicitly
-        header = "| Species | Wikidata | " + " | ".join([lang.upper() for lang in languages]) + " |\n"
-        header += "|---|---|" + "|".join(["---"] * len(languages)) + "|\n"
+        header = "| Taxon | Wikidata | " + " | ".join([lang.upper() for lang in languages]) + " |\n"
+        header += "|---|---|" + "|".join(["---"] * len(languages)) + "|"
         rows = []
         totals = {lang: 0 for lang in languages}
 
