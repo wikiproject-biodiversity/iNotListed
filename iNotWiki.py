@@ -153,14 +153,14 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         totals = {lang: 0 for lang in languages}
 
         for tn, langs_info in sorted(wiki_map.items(), key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())):
-            wd_status = "\checkmark" if langs_info["wikidata"] else "\times"
+            wd_status = ""&#10003;"" if langs_info["wikidata"] else "\times"
             row = [tn, wd_status]
             for lang in languages:
                 if lang in langs_info["existing"]:
                     # Show ✅ with link
-                    row.append(f"[{lang.upper()}  \checkmark]({langs_info['existing'][lang]})")
+                    row.append(f"[&#10003;]({langs_info['existing'][lang]})")
                 else:
-                    row.append(f"{lang.upper()} \times")
+                    row.append("&#10007;")
                     totals[lang] += 1
             rows.append("| " + " | ".join(row) + " |")
 
