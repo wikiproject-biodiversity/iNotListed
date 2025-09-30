@@ -24,8 +24,7 @@ def check_wikipedia_multilang(taxon_names, languages=None):
 
     for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
         names = " ".join(f'"{w}"' for w in chunks)
-        query = f"""
-        SELECT DISTINCT ?taxon_name ?lang ?article
+        query = f"""SELECT DISTINCT ?taxon_name ?lang ?article
         WHERE {{
             VALUES ?taxon_name {{ {names} }}
             VALUES (?lang ?wiki) {{ {lang_values} }}
