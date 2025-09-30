@@ -7,7 +7,6 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,15 +41,20 @@ jobs:
           fi
 
       - name: Run the script
+        id: run-script
         run: |
-          REPORT_FILE=$(python iNotWiki.py \
-            --username "$username" \
-            --project_id "$project_id" \
-            --country_id "$country_code" \
-            --languages "$languages" \
-          | grep "^REPORT_PATH::" | cut -d ":" -f3-)
-
-          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
+          REPORT_PATH=""
+          if [[ -n "$username" ]]; then
+              REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages")
+          elif [[ -n "$project_id" ]]; then
+              REPORT_PATH=$(python iNotWiki.py --project_id "$project_id" --languages "$languages")
+          elif [[ -n "$country_code" ]]; then
+              REPORT_PATH=$(python iNotWiki.py --country_id "$country_code" --languages "$languages")
+          else
+              DEFAULT_PROJECT_ID="biohackathon-2025"
+              REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages")
+          fi
+          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
@@ -58,14 +62,13 @@ jobs:
           name: missing-wikipedia-report
           path: suggestions/
 
-      - name: Post report as comment
+      - name: Post Markdown Report as Comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -f "$REPORT_FILE" ]; then
-            COMMENT_BODY=$(sed 's/"/\\"/g' "$REPORT_FILE" | sed ':a;N;$!ba;s/\n/\\n/g')
-            curl -s -X POST \
-              -H "Authorization: token $GITHUB_TOKEN" \
+          if [ -f "$REPORT_PATH" ]; then
+            COMMENT_BODY=$(sed 's/"/\\"/g' "$REPORT_PATH" | sed ':a;N;$!ba;s/\n/\\n/g')
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
               -d "{\"body\": \"$COMMENT_BODY\"}"
