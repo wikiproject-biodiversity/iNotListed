@@ -1,4 +1,4 @@
-name: Missing Wikipedia Articles (Project Only)
+name: Wikiblitz
 description: Request a report on taxa missing Wikipedia articles from an iNaturalist project.
 title: "[Missing Wikipedia Project]: "
 labels: ["report"]
