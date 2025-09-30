@@ -19,7 +19,7 @@
 
 - Missing in [x]: **584**
 
-| Species | Wikidata | [X] | [X] | [X] | [X] |
+| Taxon | Wikidata | [X] | [X] | [X] | [X] |
 |---|---|---|---|---|---|
 | Acanthuridae | ✅ | [X] ❌ | [X] ❌ | [X] ❌ | [X] ❌ |
 | Acromegalomma | ✅ | [X] ❌ | [X] ❌ | [X] ❌ | [X] ❌ |
