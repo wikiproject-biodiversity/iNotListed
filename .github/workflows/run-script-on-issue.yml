@@ -37,18 +37,14 @@ jobs:
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
 
           if [[ -n "$LANGUAGES" ]]; then
+              # Extract only checked languages
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
           fi
 
       - name: Run iNotWiki.py and capture report path
-        shell: bash
-        env:
-          username: ${{ env.username }}
-          project_id: ${{ env.project_id }}
-          country_code: ${{ env.country_code }}
-          languages: ${{ env.languages }}
         run: |
+          # Determine which parameter to pass to the script
           if [[ -n "$username" ]]; then
               REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages")
           elif [[ -n "$project_id" ]]; then
@@ -59,8 +55,13 @@ jobs:
               DEFAULT_PROJECT_ID="biohackathon-2025"
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages")
           fi
-
-          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
+      
+          # Export REPORT_PATH safely to GITHUB_ENV for subsequent steps
+          # echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
+          # echo "$REPORT_PATH" >> $GITHUB_ENV
+          # echo "EOF" >> $GITHUB_ENV
+          echo "REPORT_PATH=$(printf '%q' "$REPORT_PATH")" >> $GITHUB_ENV
+          echo "✅ Generated report: $REPORT_PATH"
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
@@ -68,27 +69,12 @@ jobs:
           name: missing-wikipedia-report
           path: suggestions/
 
-      - name: Post report as issue comment with images
+      - name: Post report as issue comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPORT_PATH: ${{ env.REPORT_PATH }}
-        shell: bash
         run: |
           if [ -f "$REPORT_PATH" ]; then
-            COMMENT_BODY=$(cat "$REPORT_PATH")
-
-            # Embed images as base64 in markdown
-            for img in suggestions/*.png; do
-              if [ -f "$img" ]; then
-                BASE64_IMG=$(base64 -w 0 "$img")
-                COMMENT_BODY=$(echo "$COMMENT_BODY" | sed "s|$img|data:image/png;base64,$BASE64_IMG|g")
-              fi
-            done
-
-            # Escape for JSON
-            COMMENT_BODY=$(echo "$COMMENT_BODY" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-
-            # Post comment
+            COMMENT_BODY=$(cat "$REPORT_PATH" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
             curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
