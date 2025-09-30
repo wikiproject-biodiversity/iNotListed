@@ -1,0 +1,28 @@
+name: Missing Wikipedia Articles (Project Only)
+description: Request a report on taxa missing Wikipedia articles from an iNaturalist project.
+title: "[Missing Wikipedia Project]: "
+labels: ["report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Find Missing Wikipedia Articles (Project Only)
+        Submit a request for a list of taxa missing Wikipedia articles from a specific iNaturalist project.
+
+  - type: input
+    id: project_id
+    attributes:
+      label: iNaturalist Project ID
+      description: "Enter the iNaturalist project ID to fetch taxa from."
+      placeholder: "e.g., biohackathon-2025"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_info
+    attributes:
+      label: 📝 Additional Information (optional)
+      description: "Add any extra details or specific requirements for your request."
+      placeholder: "Any special instructions or focus areas?"
+    validations:
+      required: false
