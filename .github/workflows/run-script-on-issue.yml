@@ -35,7 +35,6 @@ jobs:
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
-
           if [[ -n "$LANGUAGES" ]]; then
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
@@ -59,29 +58,22 @@ jobs:
 
           echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
 
-      - name: Upload generated report folder as artifact
+      - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
         with:
-          name: "issue-${{ github.event.issue.number }}-report"
-          path: "reports/issue-${{ github.event.issue.number }}/"
+          name: missing-wikipedia-report
+          path: reports/
 
-      - name: Commit report folder to repository
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add "reports/issue-${{ github.event.issue.number }}"
-          git commit -m "Add report for issue #${{ github.event.issue.number }}" || echo "No changes to commit"
-          git push
-
-      - name: Post report link as comment
+      - name: Post report as issue comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPORT_FILE_NAME=$(basename "$REPORT_PATH")
-          REPORT_FOLDER="reports/issue-${{ github.event.issue.number }}"
-          REPORT_LINK="[$REPORT_FILE_NAME](https://github.com/${{ github.repository }}/tree/main/$REPORT_FOLDER/$REPORT_FILE_NAME)"
-
-          curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -d "{\"body\": \"Report generated: $REPORT_LINK\"}"
+          if [ -f "$REPORT_PATH" ]; then
+            COMMENT_BODY=$(cat "$REPORT_PATH" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+              -d "{\"body\": \"$COMMENT_BODY\"}"
+          else
+            echo "❌ No report file found. Skipping comment."
+          fi
