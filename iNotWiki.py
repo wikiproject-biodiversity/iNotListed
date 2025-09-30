@@ -180,7 +180,7 @@ def generate_markdown_report(search_value, search_type="project", languages=None
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 
-    print(f"✅ Markdown report saved at: {report_path}")
+    print(report_path)
     return report_path
 
 # --------------------------
