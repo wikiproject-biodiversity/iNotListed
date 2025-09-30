@@ -21,7 +21,6 @@
 
 | Species | Wikidata | [X] | [X] | [X] | [X] |
 |---|---|---|---|---|---|
-
 | Acanthuridae | ✅ | [X] ❌ | [X] ❌ | [X] ❌ | [X] ❌ |
 | Acromegalomma | ✅ | [X] ❌ | [X] ❌ | [X] ❌ | [X] ❌ |
 | Acronicta pruinosa | ✅ | [X] ❌ | [X] ❌ | [X] ❌ | [X] ❌ |
