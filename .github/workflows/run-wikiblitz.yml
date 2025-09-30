@@ -6,7 +6,7 @@ on:
 
 jobs:
   run-project-only:
-    if: contains(github.event.issue.title, '[Missing Wikipedia Project]')
+    if: contains(github.event.issue.title, '[Wikiblitz]')
     runs-on: ubuntu-latest
 
     steps:
