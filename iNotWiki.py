@@ -90,7 +90,7 @@ def fetch_taxon_names(search_type, search_value):
 # --------------------------
 def generate_markdown_report(search_value, search_type="project", languages=None, output_folder="reports"):
     if languages is None:
-        languages = ["en", "es", "ja"]
+        languages = ["en", "es", "ja", "ar", "nl"]
 
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
