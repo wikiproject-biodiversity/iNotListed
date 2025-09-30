@@ -27,32 +27,41 @@ jobs:
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
 
-          # Function to extract the first non-empty line after a label
-          get_field() {
-            local label="$1"
-            awk -v label="$label" '
-              $0 ~ label {found=1; next}
-              found && $0 ~ /[^[:space:]]/ {print; exit}
-            ' <<< "$ISSUE_BODY"
+          # Helper function to extract a field robustly
+          extract_field() {
+              local field="$1"
+              echo "$ISSUE_BODY" | awk -v f="$field" '
+                  BEGIN { capture=0 }
+                  $0 ~ "### 🔹 "f { capture=1; next }
+                  capture && $0 ~ /^###/ { capture=0 }
+                  capture { gsub(/^[ \t]+|[ \t]+$/,""); print }
+              ' | head -n1
           }
 
-          USERNAME=$(get_field "iNaturalist Username")
-          PROJECT_ID=$(get_field "iNaturalist Project ID")
-          COUNTRY_CODE=$(get_field "iNaturalist Country/Place ID")
+          USERNAME=$(extract_field "iNaturalist Username")
+          PROJECT_ID=$(extract_field "iNaturalist Project ID")
+          COUNTRY_CODE=$(extract_field "iNaturalist Country/Place ID")
 
-          # Extract checked languages
-          LANG_LINES=$(grep -E '^\s*-\s*\[[xX]\]\s*[A-Za-z]{1,6}' <<< "$ISSUE_BODY" || true)
-          CLEAN_LANGS=$(awk '{gsub(/\[x\]|\[X\]/,""); print $1}' <<< "$LANG_LINES" | tr '\n' ',' | sed 's/,$//')
+          # Extract languages robustly (checkboxes)
+          LANGUAGES=$(echo "$ISSUE_BODY" | awk '
+              BEGIN { capture=0 }
+              /^### 🌐 Wikipedia Languages to Include/ { capture=1; next }
+              capture && /^###/ { capture=0 }
+              capture && /^\- \[x\]/ { print $2 }
+          ' | paste -sd "," -)
 
-          # Fallback if no language is selected
-          if [[ -z "$CLEAN_LANGS" ]]; then
-            CLEAN_LANGS="en,es,ja"
-          fi
-
+          # Export to GitHub environment
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
-          echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
+          echo "languages=$LANGUAGES" >> $GITHUB_ENV
+
+          # Debug
+          echo "Parsed values:"
+          echo "username='$USERNAME'"
+          echo "project_id='$PROJECT_ID'"
+          echo "country_code='$COUNTRY_CODE'"
+          echo "languages='$LANGUAGES'"
 
       - name: Run iNotWiki.py and capture report path
         run: |
@@ -70,10 +79,7 @@ jobs:
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           fi
 
-          # Safe export to GITHUB_ENV
-          echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
-          echo "$REPORT_PATH" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
 
       - name: Upload generated report as artifact
         uses: actions/upload-artifact@v4
@@ -94,7 +100,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -f "$REPORT_PATH" ]; then
-            COMMENT_BODY=$(sed 's/"/\\"/g' "$REPORT_PATH" | sed ':a;N;$!ba;s/\n/\\n/g')
+            COMMENT_BODY=$(cat "$REPORT_PATH" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
             curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
