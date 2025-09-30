@@ -37,49 +37,51 @@ jobs:
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
 
           if [[ -n "$LANGUAGES" ]]; then
-              # Extract only checked languages
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
           fi
 
       - name: Run iNotWiki.py and capture report path
         run: |
-          # Determine which parameter to pass to the script
+          ISSUE_FOLDER="reports/issue-${{ github.event.issue.number }}"
+          mkdir -p "$ISSUE_FOLDER"
+
           if [[ -n "$username" ]]; then
-              REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages")
+              REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           elif [[ -n "$project_id" ]]; then
-              REPORT_PATH=$(python iNotWiki.py --project_id "$project_id" --languages "$languages")
+              REPORT_PATH=$(python iNotWiki.py --project_id "$project_id" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           elif [[ -n "$country_code" ]]; then
-              REPORT_PATH=$(python iNotWiki.py --country_id "$country_code" --languages "$languages")
+              REPORT_PATH=$(python iNotWiki.py --country_id "$country_code" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           else
               DEFAULT_PROJECT_ID="biohackathon-2025"
-              REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages")
+              REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           fi
-      
-          # Export REPORT_PATH safely to GITHUB_ENV for subsequent steps
-          # echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
-          # echo "$REPORT_PATH" >> $GITHUB_ENV
-          # echo "EOF" >> $GITHUB_ENV
-          echo "REPORT_PATH=$(printf '%q' "$REPORT_PATH")"
-          echo "REPORT_PATH=$(printf '%q' "$REPORT_PATH")" >> $GITHUB_ENV
-          echo "✅ Generated report: $REPORT_PATH"
 
-      - name: Upload generated markdown report
+          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
+
+      - name: Upload generated report folder as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: missing-wikipedia-report
-          path: suggestions/
+          name: "issue-${{ github.event.issue.number }}-report"
+          path: "reports/issue-${{ github.event.issue.number }}/"
 
-      - name: Post report as issue comment
+      - name: Commit report folder to repository
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "reports/issue-${{ github.event.issue.number }}"
+          git commit -m "Add report for issue #${{ github.event.issue.number }}" || echo "No changes to commit"
+          git push
+
+      - name: Post report link as comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -f "$REPORT_PATH" ]; then
-            COMMENT_BODY=$(cat "$REPORT_PATH" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-              -d "{\"body\": \"$COMMENT_BODY\"}"
-          else
-            echo "❌ No report file found. Skipping comment."
-          fi
+          REPORT_FILE_NAME=$(basename "$REPORT_PATH")
+          REPORT_FOLDER="reports/issue-${{ github.event.issue.number }}"
+          REPORT_LINK="[$REPORT_FILE_NAME](https://github.com/${{ github.repository }}/tree/main/$REPORT_FOLDER/$REPORT_FILE_NAME)"
+
+          curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            -d "{\"body\": \"Report generated: $REPORT_LINK\"}"
