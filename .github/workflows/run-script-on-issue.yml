@@ -81,3 +81,4 @@ jobs:
               -d "{\"body\": \"$COMMENT_BODY\"}"
           else
             echo "❌ No report file found. Skipping comment."
+          fi
