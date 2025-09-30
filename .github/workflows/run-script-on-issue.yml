@@ -44,6 +44,7 @@ jobs:
 
       - name: Run iNotWiki.py and capture report path
         run: |
+          # Determine which parameter to pass to the script
           if [[ -n "$username" ]]; then
               REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages")
           elif [[ -n "$project_id" ]]; then
@@ -54,8 +55,13 @@ jobs:
               DEFAULT_PROJECT_ID="biohackathon-2025"
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages")
           fi
+      
+          # Export REPORT_PATH safely to GITHUB_ENV for subsequent steps
+          echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
+          echo "$REPORT_PATH" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
+          echo "✅ Generated report: $REPORT_PATH"
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
