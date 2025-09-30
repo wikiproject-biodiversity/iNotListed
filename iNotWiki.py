@@ -145,19 +145,21 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         for lang in languages:
             md_lines.append(f"- Missing in {lang}: **{missing_counts[lang]}**\n")
 
-        header = "| Species | Wikidata | " + " | ".join(languages) + " |\n"
+        # Table header uses language codes explicitly
+        header = "| Species | Wikidata | " + " | ".join([lang.upper() for lang in languages]) + " |\n"
         header += "|---|---|" + "|".join(["---"] * len(languages)) + "|\n"
         rows = []
         totals = {lang: 0 for lang in languages}
 
-        for tn, langs in sorted(wiki_map.items(), key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())):
-            wd_status = "✅" if langs["wikidata"] else "⚠️"
+        for tn, langs_info in sorted(wiki_map.items(), key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())):
+            wd_status = "✅" if langs_info["wikidata"] else "⚠️"
             row = [tn, wd_status]
             for lang in languages:
-                if lang in langs["existing"]:
-                    row.append(f"[✅]({langs['existing'][lang]})")
+                if lang in langs_info["existing"]:
+                    # Show ✅ with link
+                    row.append(f"[{lang.upper()} ✅]({langs_info['existing'][lang]})")
                 else:
-                    row.append("❌")
+                    row.append(f"{lang.upper()} ❌")
                     totals[lang] += 1
             rows.append("| " + " | ".join(row) + " |")
 
