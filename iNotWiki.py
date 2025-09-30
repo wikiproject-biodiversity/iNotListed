@@ -10,7 +10,7 @@ from datetime import datetime
 # --------------------------
 def check_wikipedia_multilang(taxon_names, languages=None):
     if languages is None:
-        languages = ["en", "es", "ja", "th", "id", "cn", "de", "fr", "it", "ru", "pt", "ar", "ko", "nl"]
+        languages = ["en", "es", "ja", "ar", "nl"]
 
     verified = {}
     batch_size = 50
