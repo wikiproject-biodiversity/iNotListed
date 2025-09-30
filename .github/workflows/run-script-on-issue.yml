@@ -35,6 +35,7 @@ jobs:
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
+
           if [[ -n "$LANGUAGES" ]]; then
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
@@ -56,17 +57,23 @@ jobs:
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages" --output-folder "$ISSUE_FOLDER")
           fi
 
-          echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
-          echo "$REPORT_PATH" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
 
-      - name: Upload generated markdown report
+      - name: Upload generated report as artifact
         uses: actions/upload-artifact@v4
         with:
           name: missing-wikipedia-report
-          path: reports/
+          path: reports/issue-${{ github.event.issue.number }}/
 
-      - name: Post report as issue comment
+      - name: Commit report folder to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/issue-${{ github.event.issue.number }}
+          git commit -m "Add report for issue #${{ github.event.issue.number }}" || echo "No changes to commit"
+          git push
+
+      - name: Post Markdown report as issue comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
