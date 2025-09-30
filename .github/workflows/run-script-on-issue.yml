@@ -37,6 +37,7 @@ jobs:
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
 
           if [[ -n "$LANGUAGES" ]]; then
+              # Extract only checked languages
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
           fi
@@ -53,11 +54,8 @@ jobs:
               DEFAULT_PROJECT_ID="biohackathon-2025"
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages")
           fi
-          
-          # Export safely to GITHUB_ENV
-          echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
-          echo "$REPORT_PATH" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+
+          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
