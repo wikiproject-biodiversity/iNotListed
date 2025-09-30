@@ -37,14 +37,19 @@ jobs:
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
 
           if [[ -n "$LANGUAGES" ]]; then
-              # Extract only checked languages
               CLEAN_LANGS=$(echo "$LANGUAGES" | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
               echo "languages=$CLEAN_LANGS" >> $GITHUB_ENV
           fi
 
       - name: Run iNotWiki.py and capture report path
+        shell: bash
+        env:
+          username: ${{ env.username }}
+          project_id: ${{ env.project_id }}
+          country_code: ${{ env.country_code }}
+          languages: ${{ env.languages }}
         run: |
-          # Determine which parameter to pass to the script
+          REPORT_PATH=""
           if [[ -n "$username" ]]; then
               REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages")
           elif [[ -n "$project_id" ]]; then
@@ -55,13 +60,11 @@ jobs:
               DEFAULT_PROJECT_ID="biohackathon-2025"
               REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages")
           fi
-      
-          # Export REPORT_PATH safely to GITHUB_ENV for subsequent steps
-          # echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
-          # echo "$REPORT_PATH" >> $GITHUB_ENV
-          # echo "EOF" >> $GITHUB_ENV
-          echo "REPORT_PATH=$(printf '%q' "$REPORT_PATH")" >> $GITHUB_ENV
-          echo "✅ Generated report: $REPORT_PATH"
+
+          # Export REPORT_PATH safely for subsequent steps
+          echo "REPORT_PATH<<EOF" >> $GITHUB_ENV
+          echo "$REPORT_PATH" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Upload generated markdown report
         uses: actions/upload-artifact@v4
@@ -72,6 +75,8 @@ jobs:
       - name: Post report as issue comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_PATH: ${{ env.REPORT_PATH }}
+        shell: bash
         run: |
           if [ -f "$REPORT_PATH" ]; then
             COMMENT_BODY=$(cat "$REPORT_PATH" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
