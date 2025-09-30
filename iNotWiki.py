@@ -91,13 +91,13 @@ def generate_markdown_report(search_value, search_type="project", languages=None
     if languages is None:
         languages = ["en", "es", "ja"]
 
+    # Ensure output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+
     taxon_names, species, observers, all_obs = fetch_taxon_names(search_type, search_value)
     species_counts = Counter(species)
     observer_counts = Counter(observers)
     wiki_map = check_wikipedia_multilang(taxon_names, languages)
-
-    issue_folder = os.path.join(output_folder, f"issue-{search_value}")
-    os.makedirs(issue_folder, exist_ok=True)
 
     md_lines = []
     md_lines.append(f"# iNaturalist {search_type.capitalize()} Report: {search_value}\n")
@@ -113,10 +113,10 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         plt.xlabel("Number of observations")
         plt.title("Top 10 Most Observed Species")
         plt.tight_layout()
-        plot_path = os.path.join(issue_folder, f"top_species_{search_value}.png")
-        plt.savefig(plot_path)
+        sp_plot_path = os.path.join(output_folder, f"top_species_{search_value}.png")
+        plt.savefig(sp_plot_path)
         plt.close()
-        md_lines.append(f"![Top 10 Species]({plot_path})\n")
+        md_lines.append(f"![Top 10 Species]({os.path.basename(sp_plot_path)})\n")
 
     if observer_counts:
         obs_labels, obs_values = zip(*observer_counts.most_common(10))
@@ -125,10 +125,10 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         plt.xlabel("Number of observations")
         plt.title("Top 10 Most Active Observers")
         plt.tight_layout()
-        plot_path = os.path.join(issue_folder, f"top_observers_{search_value}.png")
-        plt.savefig(plot_path)
+        obs_plot_path = os.path.join(output_folder, f"top_observers_{search_value}.png")
+        plt.savefig(obs_plot_path)
         plt.close()
-        md_lines.append(f"![Top 10 Observers]({plot_path})\n")
+        md_lines.append(f"![Top 10 Observers]({os.path.basename(obs_plot_path)})\n")
 
     # --- Wikipedia/Wikidata Coverage ---
     if wiki_map:
@@ -170,7 +170,9 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         md_lines.append("All species have Wikipedia articles in selected languages.\n")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = os.path.join(issue_folder, f"missing_wikipedia_{search_type}_{search_value}_{timestamp}.md")
+    report_filename = f"missing_wikipedia_{search_type}_{search_value}_{timestamp}.md"
+    report_path = os.path.join(output_folder, report_filename)
+
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 
@@ -186,20 +188,19 @@ if __name__ == "__main__":
     parser.add_argument("--username", type=str, help="iNaturalist Username")
     parser.add_argument("--country_id", type=str, help="iNaturalist Country/Place ID")
     parser.add_argument("--languages", type=str, help="Comma-separated list of Wikipedia languages")
-    parser.add_argument("--output-folder", type=str, default="reports", help="Folder to store reports")
+    parser.add_argument("--output-folder", type=str, default="reports", help="Folder to store markdown and plots")
     args = parser.parse_args()
 
     langs = args.languages.split(",") if args.languages else None
-    output_folder = args.output_folder
 
     if args.username:
-        report_path = generate_markdown_report(args.username, search_type="user", languages=langs, output_folder=output_folder)
+        report_path = generate_markdown_report(args.username, search_type="user", languages=langs, output_folder=args.output_folder)
     elif args.project_id:
-        report_path = generate_markdown_report(args.project_id, search_type="project", languages=langs, output_folder=output_folder)
+        report_path = generate_markdown_report(args.project_id, search_type="project", languages=langs, output_folder=args.output_folder)
     elif args.country_id:
-        report_path = generate_markdown_report(args.country_id, search_type="country", languages=langs, output_folder=output_folder)
+        report_path = generate_markdown_report(args.country_id, search_type="country", languages=langs, output_folder=args.output_folder)
     else:
         DEFAULT_PROJECT_ID = "biohackathon-2025"
-        report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs, output_folder=output_folder)
+        report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs, output_folder=args.output_folder)
 
-    print(report_path)
+    print(f"REPORT_PATH={report_path}")
