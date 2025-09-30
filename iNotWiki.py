@@ -196,13 +196,16 @@ if __name__ == "__main__":
 
     langs = args.languages.split(",") if args.languages else None
 
+    # Capture report_path in every case
     if args.username:
-        generate_markdown_report(args.username, search_type="user", languages=langs)
+        report_path = generate_markdown_report(args.username, search_type="user", languages=langs)
     elif args.project_id:
-        generate_markdown_report(args.project_id, search_type="project", languages=langs)
+        report_path = generate_markdown_report(args.project_id, search_type="project", languages=langs)
     elif args.country_id:
-        generate_markdown_report(args.country_id, search_type="country", languages=langs)
+        report_path = generate_markdown_report(args.country_id, search_type="country", languages=langs)
     else:
         DEFAULT_PROJECT_ID = "biohackathon-2025"
-        generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs)
+        report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs)
+
+    # Print the path for GitHub Actions
     print(f"REPORT_PATH::{report_path}")
