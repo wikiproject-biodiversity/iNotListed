@@ -49,10 +49,13 @@ body:
       options:
         - label: en
           id: en
+          default: true
         - label: es
           id: es
+          default: true
         - label: ja
           id: ja
+          default: true
         - label: th
           id: th
         - label: id
