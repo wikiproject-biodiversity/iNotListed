@@ -18,7 +18,9 @@ def check_wikipedia_multilang(taxon_names, languages=None):
     for tn in taxon_names:
         verified[tn] = {"missing": languages[:], "existing": {}, "wikidata": False}
 
+    # lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
     lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
+    print(
 
     for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
         names = " ".join(f'"{w}"' for w in chunks)
@@ -34,6 +36,7 @@ def check_wikipedia_multilang(taxon_names, languages=None):
             }}
         }}
         """
+        print(query)
         url = "https://query.wikidata.org/sparql"
         r = requests.get(url, params={"format": "json", "query": query})
         if not r.ok:
