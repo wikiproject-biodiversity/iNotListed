@@ -1,6 +1,6 @@
 name: Wikiblitz
 description: Request a report on taxa missing Wikipedia articles from an iNaturalist project.
-title: "[Missing Wikipedia Project]: "
+title: "[Wikiblitz]: "
 labels: ["report"]
 body:
   - type: markdown
