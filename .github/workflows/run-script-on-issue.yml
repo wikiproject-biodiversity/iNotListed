@@ -27,41 +27,18 @@ jobs:
           ISSUE_BODY="${{ github.event.issue.body }}"
           echo "$ISSUE_BODY" > issue_content.txt
 
-          # Helper function to extract a field robustly
-          extract_field() {
-              local field="$1"
-              echo "$ISSUE_BODY" | awk -v f="$field" '
-                  BEGIN { capture=0 }
-                  $0 ~ "### 🔹 "f { capture=1; next }
-                  capture && $0 ~ /^###/ { capture=0 }
-                  capture { gsub(/^[ \t]+|[ \t]+$/,""); print }
-              ' | head -n1
-          }
+          # Extract issue form fields
+          USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | xargs)
+          PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | xargs)
+          COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | xargs)
 
-          USERNAME=$(extract_field "iNaturalist Username")
-          PROJECT_ID=$(extract_field "iNaturalist Project ID")
-          COUNTRY_CODE=$(extract_field "iNaturalist Country/Place ID")
+          # Extract selected languages (Markdown checkboxes)
+          LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d' | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
 
-          # Extract languages robustly (checkboxes)
-          LANGUAGES=$(echo "$ISSUE_BODY" | awk '
-              BEGIN { capture=0 }
-              /^### 🌐 Wikipedia Languages to Include/ { capture=1; next }
-              capture && /^###/ { capture=0 }
-              capture && /^\- \[x\]/ { print $2 }
-          ' | paste -sd "," -)
-
-          # Export to GitHub environment
           echo "username=$USERNAME" >> $GITHUB_ENV
           echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
           echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
           echo "languages=$LANGUAGES" >> $GITHUB_ENV
-
-          # Debug
-          echo "Parsed values:"
-          echo "username='$USERNAME'"
-          echo "project_id='$PROJECT_ID'"
-          echo "country_code='$COUNTRY_CODE'"
-          echo "languages='$LANGUAGES'"
 
       - name: Run iNotWiki.py and capture report path
         run: |
