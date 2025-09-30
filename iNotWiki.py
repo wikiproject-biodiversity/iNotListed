@@ -13,7 +13,7 @@ os.makedirs(SUGGESTIONS_FOLDER, exist_ok=True)
 # --------------------------
 def check_wikipedia_multilang(taxon_names, languages=None):
     if languages is None:
-        languages = ["en", "es", "ja", "th", "id", "cn", "de", "fr", "it", "ru", "pt", "ar", "ko", "nl"]
+        languages = ["en", "es", "ja", "nl"]
 
     verified = {}
     batch_size = 50
