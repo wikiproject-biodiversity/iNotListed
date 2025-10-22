@@ -191,9 +191,9 @@ def generate_markdown_report(search_value, search_type="project", languages=None
 
         for tn, langs_info in sorted(wiki_map.items(), key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())):
             wd_status = "&#10003;" if langs_info["wikidata"] else "&#10007;"
-            wd_link = f"[link]({langs_info['wikidata_uri']})" if langs_info["wikidata_uri"] else "—"
-            gbif_link = f"[link]({langs_info['gbif_uri']})" if langs_info["gbif_uri"] else "—"
-            inat_link = f"[link]({langs_info['inaturalist_uri']})" if langs_info["inaturalist_uri"] else "—"
+            wd_link = f"[{langs_info['wikidata_uri']}]({langs_info['wikidata_uri']})" if langs_info["wikidata_uri"] else "—"
+            gbif_link = f"[{langs_info['gbif_uri']}]({langs_info['gbif_uri']})" if langs_info["gbif_uri"] else "—"
+            inat_link = f"[{langs_info['inaturalist_uri']}]({langs_info['inaturalist_uri']})" if langs_info["inaturalist_uri"] else "—"
             row = [tn, wd_link, gbif_link, inat_link]
             for lang in languages:
                 if lang in langs_info["existing"]:
