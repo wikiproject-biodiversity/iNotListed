@@ -95,12 +95,18 @@ def check_wikipedia_multilang(taxon_names, languages=None):
 # Fetch Taxon Names from iNaturalist
 # --------------------------
 def fetch_taxon_names(search_type, search_value):
+    base_url = "https://api.inaturalist.org/v1/observations"
+    params = {
+        "per_page": 200,
+        "page": 1
+    }
+
     if search_type == "project":
-        base_url = f"https://api.inaturalist.org/v1/observations?project_id={search_value}&per_page=200&page="
+        params["project_id"] = search_value
     elif search_type == "user":
-        base_url = f"https://api.inaturalist.org/v1/observations?user_id={search_value}&per_page=200&page="
+        params["user_id"] = search_value
     elif search_type == "country":
-        base_url = f"https://api.inaturalist.org/v1/observations?place_id={search_value}&per_page=200&page="
+        params["place_id"] = search_value
     else:
         raise ValueError("Invalid search_type")
 
@@ -109,13 +115,11 @@ def fetch_taxon_names(search_type, search_value):
     observers = []
     all_obs = []
 
-    page = 1
     while True:
-        url = base_url + str(page)
-        print(f"Fetching page {page}...")
-        response = requests.get(url)
+        print(f"Fetching page {params['page']}...")
+        response = requests.get(base_url, params=params)
         if not response.ok:
-            print(f"Error fetching page {page}: {response.status_code}")
+            print(f"Error fetching page {params['page']}: {response.status_code}")
             break
 
         data = response.json()
@@ -133,9 +137,9 @@ def fetch_taxon_names(search_type, search_value):
 
         if len(results) < 200:
             break  # last page reached
-        page += 1
+        params["page"] += 1
 
-    print(f"Fetched total {len(all_obs)} observations across {page} pages.")
+    print(f"Fetched total {len(all_obs)} observations across {params['page']} pages.")
     return list(set(taxon_names)), species, observers, all_obs
     
 # --------------------------
