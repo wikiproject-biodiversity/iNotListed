@@ -10,31 +10,51 @@ from datetime import datetime
 # --------------------------
 def check_wikipedia_multilang(taxon_names, languages=None):
     if languages is None:
-        languages = ["en", "es", "ja", "ar", "nl", "pt", "fr" ]
+        languages = ["en", "es", "ja", "ar", "nl", "pt", "fr"]
 
     verified = {}
     batch_size = 50
 
     for tn in taxon_names:
-        verified[tn] = {"missing": languages[:], "existing": {}, "wikidata": False}
+        verified[tn] = {
+            "missing": languages[:],
+            "existing": {},
+            "wikidata": False,
+            "wikidata_uri": None,
+            "gbif_uri": None,
+            "inaturalist_uri": None
+        }
 
-    # lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
     lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
     print(lang_values)
 
     for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
         names = " ".join(f'"{w}"' for w in chunks)
-        query = f"""SELECT DISTINCT ?taxon_name ?lang ?article
+
+        query = f"""
+        SELECT DISTINCT ?item ?itemURI ?taxon_name ?lang ?article ?iNaturalist_URI ?gbif_URI
         WHERE {{
             VALUES ?taxon_name {{ {names} }}
             VALUES (?lang ?wiki) {{ {lang_values} }}
+
             ?item wdt:P225 ?taxon_name .
+            BIND(IRI(CONCAT("https://www.wikidata.org/entity/", STRAFTER(STR(?item), "entity/"))) AS ?itemURI)
+
+            OPTIONAL {{
+                ?item wdt:P3151 ?iNaturalist_taxon .
+                BIND(IRI(CONCAT("https://www.inaturalist.org/taxa/", STR(?iNaturalist_taxon))) AS ?iNaturalist_URI)
+            }}
+            OPTIONAL {{
+                ?item wdt:P846 ?gbif_taxon .
+                BIND(IRI(CONCAT("https://www.gbif.org/species/", STR(?gbif_taxon))) AS ?gbif_URI)
+            }}
             OPTIONAL {{
                 ?article schema:about ?item ;
                          schema:isPartOf ?wiki .
             }}
         }}
         """
+
         url = "https://query.wikidata.org/sparql"
         r = requests.get(url, params={"format": "json", "query": query})
         if not r.ok:
@@ -45,8 +65,25 @@ def check_wikipedia_multilang(taxon_names, languages=None):
             tn = res["taxon_name"]["value"]
             lang = res["lang"]["value"]
             article = res.get("article", {}).get("value")
+            wd_uri = res.get("itemURI", {}).get("value")
+            gbif_uri = res.get("gbif_URI", {}).get("value")
+            inat_uri = res.get("iNaturalist_URI", {}).get("value")
+
+            if tn not in verified:
+                verified[tn] = {
+                    "missing": languages[:],
+                    "existing": {},
+                    "wikidata": False,
+                    "wikidata_uri": None,
+                    "gbif_uri": None,
+                    "inaturalist_uri": None
+                }
 
             verified[tn]["wikidata"] = True
+            verified[tn]["wikidata_uri"] = wd_uri or verified[tn]["wikidata_uri"]
+            verified[tn]["gbif_uri"] = gbif_uri or verified[tn]["gbif_uri"]
+            verified[tn]["inaturalist_uri"] = inat_uri or verified[tn]["inaturalist_uri"]
+
             if article:
                 verified[tn]["existing"][lang] = article
                 if lang in verified[tn]["missing"]:
@@ -147,14 +184,17 @@ def generate_markdown_report(search_value, search_type="project", languages=None
             md_lines.append(f"- Missing in {lang}: **{missing_counts[lang]}**\n")
 
         # Table header uses language codes explicitly
-        header = "| Taxon | Wikidata | " + " | ".join([lang.upper() for lang in languages]) + " |\n"
-        header += "|---|---|" + "|".join(["---"] * len(languages)) + "|"
+        header = "| Taxon | Wikidata | GBIF | iNaturalist | " + " | ".join([lang.upper() for lang in languages]) + " |\n"
+        header += "|---|---|---|---|" + "|".join(["---"] * len(languages)) + "|"
         rows = []
         totals = {lang: 0 for lang in languages}
 
         for tn, langs_info in sorted(wiki_map.items(), key=lambda kv: (not kv[1]["wikidata"], -len(kv[1]["missing"]), kv[0].lower())):
             wd_status = "&#10003;" if langs_info["wikidata"] else "&#10007;"
-            row = [tn, wd_status]
+            wd_link = f"[link]({langs_info['wikidata_uri']})" if langs_info["wikidata_uri"] else "—"
+            gbif_link = f"[link]({langs_info['gbif_uri']})" if langs_info["gbif_uri"] else "—"
+            inat_link = f"[link]({langs_info['inaturalist_uri']})" if langs_info["inaturalist_uri"] else "—"
+            row = [tn, wd_link, gbif_link, inat_link]
             for lang in languages:
                 if lang in langs_info["existing"]:
                     # Show ✅ with link
