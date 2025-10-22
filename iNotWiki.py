@@ -116,7 +116,7 @@ def fetch_taxon_names(search_type, search_value):
     all_obs = []
 
     while True:
-        print(f"Fetching page {params['page']}...")
+        print(f"Fetching page {params['page']}...", file=sys.stderr)
         response = requests.get(base_url, params=params)
         if not response.ok:
             print(f"Error fetching page {params['page']}: {response.status_code}")
