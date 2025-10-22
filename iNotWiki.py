@@ -27,7 +27,7 @@ def check_wikipedia_multilang(taxon_names, languages=None):
         }
 
     lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
-    print(lang_values)
+    print(lang_values, file=sys.stderr)
 
     for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
         names = " ".join(f'"{w}"' for w in chunks)
@@ -140,7 +140,7 @@ def fetch_taxon_names(search_type, search_value):
             break  # last page reached
         params["page"] += 1
 
-    print(f"Fetched total {len(all_obs)} observations across {params['page']} pages.")
+    print(f"Fetched total {len(all_obs)} observations across {params['page']} pages.", file=sys.stderr)
     return list(set(taxon_names)), species, observers, all_obs
     
 # --------------------------
