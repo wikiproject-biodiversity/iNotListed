@@ -96,32 +96,48 @@ def check_wikipedia_multilang(taxon_names, languages=None):
 # --------------------------
 def fetch_taxon_names(search_type, search_value):
     if search_type == "project":
-        url = f"https://api.inaturalist.org/v1/observations?project_id={search_value}&per_page=200"
+        base_url = f"https://api.inaturalist.org/v1/observations?project_id={search_value}&per_page=200&page="
     elif search_type == "user":
-        url = f"https://api.inaturalist.org/v1/observations?user_id={search_value}&per_page=200"
+        base_url = f"https://api.inaturalist.org/v1/observations?user_id={search_value}&per_page=200&page="
     elif search_type == "country":
-        url = f"https://api.inaturalist.org/v1/observations?place_id={search_value}&per_page=200"
+        base_url = f"https://api.inaturalist.org/v1/observations?place_id={search_value}&per_page=200&page="
     else:
         raise ValueError("Invalid search_type")
-
-    response = requests.get(url)
-    data = response.json()
 
     taxon_names = []
     species = []
     observers = []
     all_obs = []
 
-    for obs in data.get("results", []):
-        if "taxon" in obs and obs["taxon"]:
-            name = obs["taxon"]["name"]
-            taxon_names.append(name)
-            species.append(name)
-            observers.append(obs.get("user", {}).get("login", "Unknown"))
-            all_obs.append(obs)
+    page = 1
+    while True:
+        url = base_url + str(page)
+        print(f"Fetching page {page}...")
+        response = requests.get(url)
+        if not response.ok:
+            print(f"Error fetching page {page}: {response.status_code}")
+            break
 
+        data = response.json()
+        results = data.get("results", [])
+        if not results:
+            break  # stop when no more results
+
+        for obs in results:
+            if "taxon" in obs and obs["taxon"]:
+                name = obs["taxon"]["name"]
+                taxon_names.append(name)
+                species.append(name)
+                observers.append(obs.get("user", {}).get("login", "Unknown"))
+                all_obs.append(obs)
+
+        if len(results) < 200:
+            break  # last page reached
+        page += 1
+
+    print(f"Fetched total {len(all_obs)} observations across {page} pages.")
     return list(set(taxon_names)), species, observers, all_obs
-
+    
 # --------------------------
 # Generate Markdown Report
 # --------------------------
