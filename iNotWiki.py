@@ -10,7 +10,7 @@ from datetime import datetime
 # --------------------------
 def check_wikipedia_multilang(taxon_names, languages=None):
     if languages is None:
-        languages = ["en", "es", "ja", "ar", "nl"]
+        languages = ["en", "es", "ja", "ar", "nl", "pt", "fr" ]
 
     verified = {}
     batch_size = 50
@@ -90,7 +90,7 @@ def fetch_taxon_names(search_type, search_value):
 # --------------------------
 def generate_markdown_report(search_value, search_type="project", languages=None, output_folder="reports"):
     if languages is None:
-        languages = ["en", "es", "ja", "ar", "nl"]
+        languages = ["en", "es", "ja", "ar", "nl", "pt", "fr"]
 
     # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
