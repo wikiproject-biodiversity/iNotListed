@@ -1,4 +1,4 @@
-# 🦠 iNotWiki: Missing Wikipedia Articles CLI Tool
+# iNotWiki: Missing Wikipedia Articles CLI Tool
 
 A command-line tool to find **missing Wikipedia articles** for biological taxa using **iNaturalist** and **Wikidata**.
 
