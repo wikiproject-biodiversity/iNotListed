@@ -3,6 +3,13 @@
 A command-line tool to find **missing Wikipedia articles** for biological taxa using
 **iNaturalist** and **Wikidata**.
 
+> **Hosted redundantly.** This project is intentionally published on two
+> independent forges so it stays reachable even if one of them is down or
+> changes its terms:
+>
+> - **Primary:** [codeberg.org/wikiproject-biodiversity/iNotListed](https://codeberg.org/wikiproject-biodiversity/iNotListed) — issues, PRs and CI live here.
+> - **Mirror:** [github.com/wikiproject-biodiversity/iNotListed](https://github.com/wikiproject-biodiversity/iNotListed) — kept in sync, read-only.
+
 ## Features
 - Fetches observations from **iNaturalist** with pagination via `id_above`
   (works for projects with more than 10 000 observations).
