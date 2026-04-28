@@ -1,8 +1,8 @@
 """Telegram bot wrapping iNotWiki.
 
-Members of the configured Telegram channel can run a wikiblitz against an
+Members of the configured Telegram group(s) can run a wikiblitz against an
 iNaturalist project; the bot replies with a short summary plus the full
-Markdown report as an attachment.
+report rendered as a PDF.
 
 Configured via environment:
     TELEGRAM_BOT_TOKEN   token from @BotFather
@@ -33,6 +33,7 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT))
 
 from iNotWiki import generate_markdown_report  # noqa: E402
+from bot.pdf import md_to_pdf  # noqa: E402
 
 DEFAULT_LANGS = ["en", "es", "ja", "ar", "nl", "pt", "fr"]
 PROJECT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{1,80}$")
@@ -60,22 +61,22 @@ def parse_args(args: list[str]) -> tuple[str | None, list[str], set[str], str | 
         return None, DEFAULT_LANGS, set(), None
     project = args[0].strip()
     if not PROJECT_RE.match(project):
-        return None, DEFAULT_LANGS, set(), f"ongeldig project_id: {project!r}"
+        return None, DEFAULT_LANGS, set(), f"invalid project_id: {project!r}"
     langs = DEFAULT_LANGS[:]
     accept: set[str] = set()
     for kv in args[1:]:
         if "=" not in kv:
-            return project, langs, accept, f"verwachtte key=value, kreeg {kv!r}"
+            return project, langs, accept, f"expected key=value, got {kv!r}"
         k, v = kv.split("=", 1)
         k = k.strip().lower()
         if k == "lang":
             langs = [x.strip() for x in v.split(",") if x.strip()]
             if not langs:
-                return project, DEFAULT_LANGS, accept, "lang= zonder waardes"
+                return project, DEFAULT_LANGS, accept, "lang= without values"
         elif k == "accept":
             accept = {x.strip().lower() for x in v.split(",") if x.strip()}
         else:
-            return project, langs, accept, f"onbekende optie {k!r}"
+            return project, langs, accept, f"unknown option {k!r}"
     return project, langs, accept, None
 
 
@@ -88,15 +89,15 @@ def format_summary(summary: dict[str, Any]) -> str:
     top_species = "\n".join(
         f"  {i+1}. {html.escape(str(name))} ({n})"
         for i, (name, n) in enumerate(summary["top_species"][:5])
-    ) or "  (geen)"
+    ) or "  (none)"
     return (
         f"📊 <b>iNaturalist project</b>: <code>{html.escape(str(summary['search_value']))}</code>\n"
-        f"• Observaties: <b>{summary['total_observations']}</b>\n"
-        f"• Unieke soorten: <b>{summary['unique_species']}</b>\n"
-        f"• Waarnemers: <b>{summary['unique_observers']}</b>\n"
-        f"• Niet op Wikidata: <b>{summary['not_on_wikidata']}</b>\n"
-        f"\n<b>Ontbrekende Wikipedia-artikelen:</b>\n{miss_lines}\n"
-        f"\n<b>Meest waargenomen:</b>\n{top_species}"
+        f"• Observations: <b>{summary['total_observations']}</b>\n"
+        f"• Unique species: <b>{summary['unique_species']}</b>\n"
+        f"• Observers: <b>{summary['unique_observers']}</b>\n"
+        f"• Not on Wikidata: <b>{summary['not_on_wikidata']}</b>\n"
+        f"\n<b>Missing Wikipedia articles:</b>\n{miss_lines}\n"
+        f"\n<b>Most observed:</b>\n{top_species}"
     )
 
 
@@ -123,11 +124,11 @@ async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
 async def cmd_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "iNotListed bot.\n\n"
-        "Gebruik:\n"
-        "  /wikiblitz <project_id_of_slug> [lang=en,nl] [accept=wikidata,gbif]\n\n"
-        "Voorbeeld:\n"
+        "Usage:\n"
+        "  /wikiblitz <project_id_or_slug> [lang=en,nl] [accept=wikidata,gbif]\n\n"
+        "Example:\n"
         "  /wikiblitz biohackathon-2025 lang=en,nl\n\n"
-        "Toegang: leden van de geconfigureerde Telegram-groep(en)."
+        "Access: members of the configured Telegram group(s)."
     )
 
 
@@ -137,8 +138,8 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     if not await is_member(context, user.id):
         await update.message.reply_text(
-            "Sorry, deze bot is alleen voor leden van het kanaal "
-            "WikiProject Biodiversity."
+            "Sorry, this bot is only available to members of the configured "
+            "Telegram group(s)."
         )
         return
 
@@ -148,7 +149,7 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
     if not project:
         await update.message.reply_text(
-            "Geef een project_id of slug: /wikiblitz <project_id> [lang=en,nl]"
+            "Provide a project_id or slug: /wikiblitz <project_id> [lang=en,nl]"
         )
         return
 
@@ -162,9 +163,9 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     output_folder.mkdir(parents=True, exist_ok=True)
 
     ack = await update.message.reply_text(
-        f"⏳ Bezig met <code>{html.escape(project)}</code> "
-        f"(talen: {html.escape(','.join(langs))}). "
-        "Dit kan een paar minuten duren.",
+        f"⏳ Working on <code>{html.escape(project)}</code> "
+        f"(languages: {html.escape(','.join(langs))}). "
+        "This may take a few minutes.",
         parse_mode=ParseMode.HTML,
     )
 
@@ -178,20 +179,31 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
     except Exception as exc:  # noqa: BLE001
         log.exception("report failed for %s", project)
-        await ack.edit_text(f"❌ Fout: {exc}")
+        await ack.edit_text(f"❌ Error: {exc}")
         return
 
     try:
         await ack.edit_text(format_summary(summary), parse_mode=ParseMode.HTML)
     except Exception:  # noqa: BLE001 - last-ditch fallback
         log.exception("HTML render failed; falling back to plain text")
-        await ack.edit_text(format_summary(summary).replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", ""))
+        plain = format_summary(summary)
+        for tag in ("<b>", "</b>", "<code>", "</code>"):
+            plain = plain.replace(tag, "")
+        await ack.edit_text(plain)
 
-    with open(report_path, "rb") as fh:
+    # Render the markdown to PDF for Telegram (which previews PDFs nicely).
+    pdf_path: str | None = None
+    try:
+        pdf_path = await asyncio.to_thread(md_to_pdf, report_path)
+    except Exception:  # noqa: BLE001 - fall back to .md
+        log.exception("PDF rendering failed; sending markdown instead")
+
+    attachment_path = pdf_path or report_path
+    with open(attachment_path, "rb") as fh:
         await update.message.reply_document(
             document=fh,
-            filename=os.path.basename(report_path),
-            caption=f"Volledig rapport voor {project}",
+            filename=os.path.basename(attachment_path),
+            caption=f"Full report for {project}",
         )
 
 
