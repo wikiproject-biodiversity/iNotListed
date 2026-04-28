@@ -11,7 +11,9 @@ permissions:
 jobs:
   run-project-only:
     if: contains(github.event.issue.title, '[Missing Wikipedia]')
-    runs-on: ubuntu-latest
+    runs-on: docker
+    container:
+      image: code.forgejo.org/oci/ci:latest
 
     steps:
       - name: Checkout repository
@@ -23,7 +25,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests matplotlib
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends jq
+          pip install requests matplotlib
 
       - name: Parse issue form
         id: parse
@@ -57,32 +61,25 @@ jobs:
           REPORT_PATH=$(python iNotWiki.py "${ARGS[@]}")
           echo "report_path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Upload generated report as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: missing-wikipedia-report
-          path: reports/issue-${{ github.event.issue.number }}/
-
-      - name: Commit report folder to repository
+      - name: Commit report folder
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "forgejo-actions"
+          git config user.email "forgejo-actions@noreply.${{ github.server_url }}"
           git add "reports/issue-${ISSUE_NUMBER}"
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
             git commit -m "Add report for issue #${ISSUE_NUMBER}"
-            git push
+            git push "$(echo "${{ github.server_url }}" | sed "s|https://|https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@|")/${{ github.repository }}.git" HEAD:${{ github.ref_name }}
           fi
 
       - name: Post Markdown report as issue comment
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPORT_PATH: ${{ steps.run.outputs.report_path }}
         run: |
           set -euo pipefail
@@ -90,14 +87,15 @@ jobs:
             echo "No report file at $REPORT_PATH; skipping comment."
             exit 0
           fi
-
-          # GitHub comment limit is 65 536 chars; truncate with a pointer to the file.
           MAX=60000
           BODY=$(head -c "$MAX" "$REPORT_PATH")
           if [ "$(wc -c < "$REPORT_PATH")" -gt "$MAX" ]; then
             SUFFIX=$(printf '\n\n%s\n_Report truncated. Full file: `%s` in this repository._' '---' "$REPORT_PATH")
             BODY="${BODY}${SUFFIX}"
           fi
-
           jq -n --arg body "$BODY" '{body: $body}' \
-            | gh api -X POST "repos/${REPO}/issues/${ISSUE_NUMBER}/comments" --input -
+            | curl -fsS -X POST \
+                -H "Authorization: token ${GITHUB_TOKEN}" \
+                -H "Content-Type: application/json" \
+                --data-binary @- \
+                "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

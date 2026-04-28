@@ -67,8 +67,8 @@ python iNotWiki.py --country_id 7088 --output-folder reports/colombia
 
 ---
 
-## GitHub-issue interface
-Two issue templates trigger the workflows in `.github/workflows/`:
+## Issue-driven interface (Codeberg / Forgejo Actions)
+Two issue templates trigger the workflows in `.forgejo/workflows/`:
 
 - **`[Wikiblitz]: …`** — runs the project-only workflow.
 - **`[Missing Wikipedia]: …`** — runs the full form (project / user / country
