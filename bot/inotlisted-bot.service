@@ -9,6 +9,7 @@ User=inotbot
 Group=inotbot
 WorkingDirectory=/home/inotbot/iNotListed
 EnvironmentFile=/etc/inotbot/bot.env
+Environment=MPLCONFIGDIR=/tmp/matplotlib-inotbot
 ExecStart=/home/inotbot/.venv/bin/python -m bot.main
 Restart=on-failure
 RestartSec=10s

@@ -45,6 +45,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# httpx logs the full URL of every Telegram API call, and python-telegram-bot
+# embeds the bot token in the URL path (`/bot<token>/getMe`). Silence it so the
+# token never leaks into journald / log files.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("inotbot")
 
 
