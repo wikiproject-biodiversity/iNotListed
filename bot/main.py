@@ -16,6 +16,7 @@ Configured via environment:
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import os
 import pathlib
@@ -79,22 +80,23 @@ def parse_args(args: list[str]) -> tuple[str | None, list[str], set[str], str | 
 
 
 def format_summary(summary: dict[str, Any]) -> str:
+    """Build a Telegram HTML message summarising the report."""
     missing = summary["missing_by_lang"]
     miss_lines = "\n".join(
-        f"  • {lang}: {count}" for lang, count in missing.items()
+        f"  • {html.escape(lang)}: {count}" for lang, count in missing.items()
     )
     top_species = "\n".join(
-        f"  {i+1}. {name} ({n})"
+        f"  {i+1}. {html.escape(str(name))} ({n})"
         for i, (name, n) in enumerate(summary["top_species"][:5])
     ) or "  (geen)"
     return (
-        f"📊 *iNaturalist project*: `{summary['search_value']}`\n"
-        f"• Observaties: *{summary['total_observations']}*\n"
-        f"• Unieke soorten: *{summary['unique_species']}*\n"
-        f"• Waarnemers: *{summary['unique_observers']}*\n"
-        f"• Niet op Wikidata: *{summary['not_on_wikidata']}*\n"
-        f"\n*Ontbrekende Wikipedia-artikelen:*\n{miss_lines}\n"
-        f"\n*Meest waargenomen:*\n{top_species}"
+        f"📊 <b>iNaturalist project</b>: <code>{html.escape(str(summary['search_value']))}</code>\n"
+        f"• Observaties: <b>{summary['total_observations']}</b>\n"
+        f"• Unieke soorten: <b>{summary['unique_species']}</b>\n"
+        f"• Waarnemers: <b>{summary['unique_observers']}</b>\n"
+        f"• Niet op Wikidata: <b>{summary['not_on_wikidata']}</b>\n"
+        f"\n<b>Ontbrekende Wikipedia-artikelen:</b>\n{miss_lines}\n"
+        f"\n<b>Meest waargenomen:</b>\n{top_species}"
     )
 
 
@@ -125,8 +127,7 @@ async def cmd_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
         "  /wikiblitz <project_id_of_slug> [lang=en,nl] [accept=wikidata,gbif]\n\n"
         "Voorbeeld:\n"
         "  /wikiblitz biohackathon-2025 lang=en,nl\n\n"
-        "Toegang: leden van het kanaal *WikiProject Biodiversity*.",
-        parse_mode=ParseMode.MARKDOWN,
+        "Toegang: leden van de geconfigureerde Telegram-groep(en)."
     )
 
 
@@ -161,9 +162,10 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     output_folder.mkdir(parents=True, exist_ok=True)
 
     ack = await update.message.reply_text(
-        f"⏳ Bezig met `{project}` (talen: {','.join(langs)}). "
+        f"⏳ Bezig met <code>{html.escape(project)}</code> "
+        f"(talen: {html.escape(','.join(langs))}). "
         "Dit kan een paar minuten duren.",
-        parse_mode=ParseMode.MARKDOWN,
+        parse_mode=ParseMode.HTML,
     )
 
     try:
@@ -180,9 +182,10 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     try:
-        await ack.edit_text(format_summary(summary), parse_mode=ParseMode.MARKDOWN)
-    except Exception:  # noqa: BLE001 - markdown can fail on weird names
-        await ack.edit_text(format_summary(summary))
+        await ack.edit_text(format_summary(summary), parse_mode=ParseMode.HTML)
+    except Exception:  # noqa: BLE001 - last-ditch fallback
+        log.exception("HTML render failed; falling back to plain text")
+        await ack.edit_text(format_summary(summary).replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", ""))
 
     with open(report_path, "rb") as fh:
         await update.message.reply_document(
