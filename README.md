@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> 👉 **You're on the GitHub mirror.** Active development happens on Codeberg:
+> **https://codeberg.org/wikiproject-biodiversity/iNotListed**
+> Please open issues and pull requests there.
+
+---
+
 **English** · [Français](README.fr.md) · [Español](README.es.md) · [日本語](README.ja.md) · [മലയാളം](README.ml.md) · [Igbo](README.ig.md) · [Dagbanli](README.dag.md)
 
 # iNotWiki: Missing Wikipedia Articles CLI Tool
