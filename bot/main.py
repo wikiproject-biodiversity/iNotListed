@@ -6,8 +6,9 @@ Markdown report as an attachment.
 
 Configured via environment:
     TELEGRAM_BOT_TOKEN   token from @BotFather
-    TELEGRAM_CHANNEL     channel username (with @) or numeric chat-id;
-                         membership is required to use the bot.
+    TELEGRAM_CHANNEL     comma-separated list of channel/group identifiers
+                         (each one a @username or a numeric chat-id);
+                         a user is allowed if they are a member of ANY of them.
                          If empty, the bot is unrestricted (development).
     INOTLISTED_WORKDIR   directory to write reports (default: ./reports/telegram)
 """
@@ -92,16 +93,24 @@ def format_summary(summary: dict[str, Any]) -> str:
     )
 
 
+def _configured_channels() -> list[str]:
+    raw = os.environ.get("TELEGRAM_CHANNEL", "")
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
 async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
-    channel = os.environ.get("TELEGRAM_CHANNEL", "").strip()
-    if not channel:
-        return True
-    try:
-        member = await context.bot.get_chat_member(channel, user_id)
-    except Exception as exc:  # noqa: BLE001 - log + deny
-        log.warning("membership check failed for %s: %s", user_id, exc)
-        return False
-    return member.status in ALLOWED_MEMBER_STATUSES
+    channels = _configured_channels()
+    if not channels:
+        return True  # no gate configured (dev mode)
+    for channel in channels:
+        try:
+            member = await context.bot.get_chat_member(channel, user_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("membership check failed in %s for %s: %s", channel, user_id, exc)
+            continue
+        if member.status in ALLOWED_MEMBER_STATUSES:
+            return True
+    return False
 
 
 async def cmd_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -188,7 +197,8 @@ def main() -> int:
     app.add_handler(CommandHandler(["start", "help"], cmd_start))
     app.add_handler(CommandHandler("wikiblitz", cmd_wikiblitz))
 
-    log.info("inotbot starting (channel=%r)", os.environ.get("TELEGRAM_CHANNEL", ""))
+    channels = _configured_channels()
+    log.info("inotbot starting (allowed channels=%s)", channels or "(none — open mode)")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
     return 0
 
