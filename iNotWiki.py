@@ -2,9 +2,32 @@ import argparse
 import sys
 import os
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from collections import Counter
 import matplotlib.pyplot as plt
 from datetime import datetime
+
+USER_AGENT = "iNotListed/0.2 (+https://github.com/wikiproject-biodiversity/iNotListed)"
+
+
+def _build_session():
+    s = requests.Session()
+    s.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
+    retry = Retry(
+        total=5,
+        backoff_factor=1.5,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=("GET", "POST"),
+        respect_retry_after_header=True,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+    return s
+
+
+SESSION = _build_session()
 
 # --------------------------
 # Wikipedia/Wikidata Check
@@ -27,7 +50,6 @@ def check_wikipedia_multilang(taxon_names, languages=None):
         }
 
     lang_values = " ".join(f'("{l}" <https://{l}.wikipedia.org/>)' for l in languages)
-    print(lang_values, file=sys.stderr)
 
     for chunks in [taxon_names[i:i + batch_size] for i in range(0, len(taxon_names), batch_size)]:
         names = " ".join(f'"{w}"' for w in chunks)
@@ -57,8 +79,17 @@ def check_wikipedia_multilang(taxon_names, languages=None):
         """
 
         url = "https://query.wikidata.org/sparql"
-        r = requests.get(url, params={"format": "json", "query": query})
+        try:
+            r = SESSION.get(url, params={"format": "json", "query": query}, timeout=90)
+        except requests.RequestException as exc:
+            print(f"Wikidata SPARQL error for batch of {len(chunks)} taxa: {exc}", file=sys.stderr)
+            continue
         if not r.ok:
+            print(
+                f"Wikidata SPARQL HTTP {r.status_code} for batch of {len(chunks)} taxa: "
+                f"{r.text[:200]}",
+                file=sys.stderr,
+            )
             continue
 
         results = r.json()["results"]["bindings"]
@@ -99,7 +130,9 @@ def fetch_taxon_names(search_type, search_value):
     base_url = "https://api.inaturalist.org/v1/observations"
     params = {
         "per_page": 200,
-        "page": 1
+        "order": "asc",
+        "order_by": "id",
+        "id_above": 0,
     }
 
     if search_type == "project":
@@ -111,37 +144,56 @@ def fetch_taxon_names(search_type, search_value):
     else:
         raise ValueError("Invalid search_type")
 
-    taxon_names = []
     species = []
     observers = []
     all_obs = []
+    page_count = 0
 
     while True:
-        print(f"Fetching page {params['page']}...", file=sys.stderr)
-        response = requests.get(base_url, params=params)
+        page_count += 1
+        print(f"Fetching iNaturalist page {page_count} (id_above={params['id_above']})...", file=sys.stderr)
+        try:
+            response = SESSION.get(base_url, params=params, timeout=60)
+        except requests.RequestException as exc:
+            print(f"iNaturalist request failed on page {page_count}: {exc}", file=sys.stderr)
+            break
         if not response.ok:
-            print(f"Error fetching page {params['page']}: {response.status_code}")
+            print(
+                f"iNaturalist HTTP {response.status_code} on page {page_count}: "
+                f"{response.text[:200]}",
+                file=sys.stderr,
+            )
             break
 
         data = response.json()
         results = data.get("results", [])
         if not results:
-            break  # stop when no more results
+            break
 
+        max_id = params["id_above"]
         for obs in results:
+            obs_id = obs.get("id", 0)
+            if obs_id > max_id:
+                max_id = obs_id
             if "taxon" in obs and obs["taxon"]:
                 name = obs["taxon"]["name"]
-                taxon_names.append(name)
                 species.append(name)
                 observers.append(obs.get("user", {}).get("login", "Unknown"))
                 all_obs.append(obs)
 
-        if len(results) < 200:
-            break  # last page reached
-        params["page"] += 1
+        if len(results) < params["per_page"]:
+            break
+        if max_id == params["id_above"]:
+            break  # no progress, avoid infinite loop
+        params["id_above"] = max_id
 
-    print(f"Fetched total {len(all_obs)} observations across {params['page']} pages.", file=sys.stderr)
-    return list(set(taxon_names)), species, observers, all_obs
+    unique_taxa = list(dict.fromkeys(species))  # preserve first-seen order
+    print(
+        f"Fetched {len(all_obs)} observations across {page_count} pages "
+        f"({len(unique_taxa)} unique taxa).",
+        file=sys.stderr,
+    )
+    return unique_taxa, species, observers, all_obs
     
 # --------------------------
 # Generate Markdown Report
@@ -190,9 +242,9 @@ def generate_markdown_report(search_value, search_type="project", languages=None
         md_lines.append(f"![Top 10 Observers]({os.path.basename(obs_plot_path)})\n")
 
     # --- Wikipedia/Wikidata Coverage ---
+    missing_counts: Counter = Counter()
+    not_on_wd = 0
     if wiki_map:
-        missing_counts = Counter()
-        not_on_wd = 0
         for tn, langs in wiki_map.items():
             if not langs["wikidata"]:
                 not_on_wd += 1
@@ -239,7 +291,20 @@ def generate_markdown_report(search_value, search_type="project", languages=None
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
-    return report_path
+
+    summary = {
+        "search_type": search_type,
+        "search_value": search_value,
+        "languages": list(languages),
+        "total_observations": len(all_obs),
+        "unique_species": len(set(species)),
+        "unique_observers": len(set(observers)),
+        "not_on_wikidata": not_on_wd,
+        "missing_by_lang": {lang: int(missing_counts.get(lang, 0)) for lang in languages},
+        "top_species": species_counts.most_common(5),
+        "top_observers": observer_counts.most_common(5),
+    }
+    return report_path, summary
 
 # --------------------------
 # CLI
@@ -256,13 +321,18 @@ if __name__ == "__main__":
     langs = args.languages.split(",") if args.languages else None
 
     if args.username:
-        report_path = generate_markdown_report(args.username, search_type="user", languages=langs, output_folder=args.output_folder)
+        report_path, _ = generate_markdown_report(args.username, search_type="user", languages=langs, output_folder=args.output_folder)
     elif args.project_id:
-        report_path = generate_markdown_report(args.project_id, search_type="project", languages=langs, output_folder=args.output_folder)
+        report_path, _ = generate_markdown_report(args.project_id, search_type="project", languages=langs, output_folder=args.output_folder)
     elif args.country_id:
-        report_path = generate_markdown_report(args.country_id, search_type="country", languages=langs, output_folder=args.output_folder)
+        report_path, _ = generate_markdown_report(args.country_id, search_type="country", languages=langs, output_folder=args.output_folder)
     else:
         DEFAULT_PROJECT_ID = "biohackathon-2025"
-        report_path = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs, output_folder=args.output_folder)
+        report_path, _ = generate_markdown_report(DEFAULT_PROJECT_ID, search_type="project", languages=langs, output_folder=args.output_folder)
 
-    print(f"REPORT_PATH={report_path}")
+    # Stdout = path only, so workflows can do REPORT_PATH=$(python iNotWiki.py …).
+    print(report_path)
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a", encoding="utf-8") as fh:
+            fh.write(f"report_path={report_path}\n")

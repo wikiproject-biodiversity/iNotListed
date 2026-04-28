@@ -1,73 +1,87 @@
 # iNotWiki: Missing Wikipedia Articles CLI Tool
 
-A command-line tool to find **missing Wikipedia articles** for biological taxa using **iNaturalist** and **Wikidata**.
+A command-line tool to find **missing Wikipedia articles** for biological taxa using
+**iNaturalist** and **Wikidata**.
 
-## Features:
-* Fetches observations from **iNaturalist** (with **pagination** support).  
-* Checks **Wikidata** to see if taxa have existing **Wikipedia pages**.  
-* Outputs a list of **taxa** that do **not** have Wikipedia articles.  
-* Uses a **progress bar (`tqdm`)** to track both **iNaturalist pagination** and **Wikidata verification**.  
-* Works via **CLI**, allowing searches by **taxon, user, country, or project**.  
-
----
-
-## 📥 Installation
-### **1. Install Python Dependencies**
-You need **Python 3.7+**. Install required packages:
-```sh
-pip install requests tqdm wikidataintegrator
-```
-
-### **2. Download the script**
-[Download `iNotWiki.py`](sandbox:/mnt/data/iNotWiki.py)  
-Or, copy the script from this repository.
+## Features
+- Fetches observations from **iNaturalist** with pagination via `id_above`
+  (works for projects with more than 10 000 observations).
+- Looks up each taxon on **Wikidata** and checks for Wikipedia articles in the
+  requested languages.
+- Generates a Markdown report with a table per taxon and PNG plots of the
+  top observers / most-observed species.
+- Identifies as `iNotListed/<version>` and retries on transient HTTP errors
+  (429 / 5xx) with exponential backoff.
 
 ---
 
-## 🚀 Usage
-Run the script from the terminal:
+## Installation
+Requires **Python 3.9+**.
+
 ```sh
-python iNotWiki.py [command] [options]
-```
-
-### **Commands**
-| Command | Description |
-|---------|------------|
-| `taxon` | Search for missing Wikipedia articles by **iNaturalist Taxon ID** |
-| `user` | Search by **iNaturalist username** (find missing taxa in their observations) |
-| `country` | Search by **iNaturalist country code** (find missing taxa from a country) |
-| `project` | Search by **iNaturalist project ID** |
-
----
-
-## 🎯 Examples
-### 🔍 **Find missing Wikipedia articles for a taxon**
-```sh
-python iNotWiki.py taxon 47222
-```
-
-### 🧑‍🔬 **Find missing articles for an iNaturalist user**
-```sh
-python iNotWiki.py user example_user --wikipedia https://en.wikipedia.org/
-```
-
-### 🌍 **Find missing taxa from a country**
-```sh
-python iNotWiki.py country 21
-```
-
-### 🏗 **Find missing Wikipedia articles in a project**
-```sh
-python iNotWiki.py project 54321
+pip install requests matplotlib
 ```
 
 ---
 
-## 🛠 Development & Contributions
-Feel free to contribute to `iNotWiki` by submitting pull requests or reporting issues.
+## Usage
+```sh
+python iNotWiki.py [options]
+```
+
+Provide exactly **one** of `--project_id`, `--username`, or `--country_id`.
+If none is provided, the script falls back to the project `biohackathon-2025`.
+
+| Option            | Description                                                       |
+|-------------------|-------------------------------------------------------------------|
+| `--project_id`    | iNaturalist project ID or slug (e.g. `biohackathon-2025`)         |
+| `--username`      | iNaturalist username                                              |
+| `--country_id`    | iNaturalist place ID                                              |
+| `--languages`     | Comma-separated Wikipedia language codes (default: `en,es,ja,ar,nl,pt,fr`) |
+| `--output-folder` | Folder to write the Markdown report and PNG plots (default: `reports`) |
+
+The script prints the path of the generated Markdown report on stdout, so it
+plays well with shell capture:
+
+```sh
+REPORT_PATH=$(python iNotWiki.py --project_id biohackathon-2025)
+```
+
+When run inside GitHub Actions it also writes `report_path=…` to
+`$GITHUB_OUTPUT`.
 
 ---
 
-## 📜 License
-This script is open-source and available under the **MIT License**.
+## Examples
 
+```sh
+# Project (slug or numeric id)
+python iNotWiki.py --project_id biohackathon-2025
+
+# User, restricted to a few languages
+python iNotWiki.py --username johndoe --languages en,nl,de
+
+# Place / country
+python iNotWiki.py --country_id 7088 --output-folder reports/colombia
+```
+
+---
+
+## GitHub-issue interface
+Two issue templates trigger the workflows in `.github/workflows/`:
+
+- **`[Wikiblitz]: …`** — runs the project-only workflow.
+- **`[Missing Wikipedia]: …`** — runs the full form (project / user / country
+  + language checkboxes).
+
+Both workflows commit the generated report under `reports/issue-<n>/` and
+post (a truncated copy of) the Markdown back as an issue comment.
+
+---
+
+## Development
+The CLI lives in a single file (`iNotWiki.py`) for now. A small Telegram bot
+that wraps it is in development — see the issue tracker.
+
+## License
+MIT.

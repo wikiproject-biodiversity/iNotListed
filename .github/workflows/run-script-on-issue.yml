@@ -4,6 +4,10 @@ on:
   issues:
     types: [opened]
 
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   run-project-only:
     if: contains(github.event.issue.title, '[Missing Wikipedia]')
@@ -14,49 +18,44 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install dependencies
+        run: pip install requests matplotlib
+
+      - name: Parse issue form
+        id: parse
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
-          pip install requests tqdm matplotlib
+          printf '%s' "$ISSUE_BODY" | python scripts/parse_issue.py >> "$GITHUB_OUTPUT"
 
-      - name: Parse issue and extract parameters
-        id: parse-issue
+      - name: Run iNotWiki.py
+        id: run
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          USERNAME: ${{ steps.parse.outputs.username }}
+          PROJECT_ID: ${{ steps.parse.outputs.project_id }}
+          COUNTRY_ID: ${{ steps.parse.outputs.country_id }}
+          LANGUAGES: ${{ steps.parse.outputs.languages }}
         run: |
-          ISSUE_BODY="${{ github.event.issue.body }}"
-          echo "$ISSUE_BODY" > issue_content.txt
-
-          # Extract values from issue form
-          USERNAME=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Username/,/^###/p' | sed '1d;$d' | xargs)
-          PROJECT_ID=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Project ID/,/^###/p' | sed '1d;$d' | xargs)
-          COUNTRY_CODE=$(echo "$ISSUE_BODY" | sed -n '/^### 🔹 iNaturalist Country\/Place ID/,/^###/p' | sed '1d;$d' | xargs)
-          LANGUAGES=$(echo "$ISSUE_BODY" | sed -n '/^### 🌐 Wikipedia Languages to Include/,/^###/p' | sed '1d;$d' | grep '^\- \[x\]' | awk '{print $2}' | paste -sd "," -)
-
-          # Export to GitHub environment
-          echo "username=$USERNAME" >> $GITHUB_ENV
-          echo "project_id=$PROJECT_ID" >> $GITHUB_ENV
-          echo "country_code=$COUNTRY_CODE" >> $GITHUB_ENV
-          echo "languages=$LANGUAGES" >> $GITHUB_ENV
-
-      - name: Run iNotWiki.py and capture report path
-        run: |
-          ISSUE_FOLDER="reports/issue-${{ github.event.issue.number }}"
+          set -euo pipefail
+          ISSUE_FOLDER="reports/issue-${ISSUE_NUMBER}"
           mkdir -p "$ISSUE_FOLDER"
 
-          if [[ -n "$username" ]]; then
-              REPORT_PATH=$(python iNotWiki.py --username "$username" --languages "$languages" --output-folder "$ISSUE_FOLDER")
-          elif [[ -n "$project_id" ]]; then
-              REPORT_PATH=$(python iNotWiki.py --project_id "$project_id" --languages "$languages" --output-folder "$ISSUE_FOLDER")
-          elif [[ -n "$country_code" ]]; then
-              REPORT_PATH=$(python iNotWiki.py --country_id "$country_code" --languages "$languages" --output-folder "$ISSUE_FOLDER")
-          else
-              DEFAULT_PROJECT_ID="biohackathon-2025"
-              REPORT_PATH=$(python iNotWiki.py --project_id "$DEFAULT_PROJECT_ID" --languages "$languages" --output-folder "$ISSUE_FOLDER")
+          ARGS=(--output-folder "$ISSUE_FOLDER")
+          [ -n "$LANGUAGES" ] && ARGS+=(--languages "$LANGUAGES")
+
+          if   [ -n "$USERNAME"   ]; then ARGS+=(--username   "$USERNAME")
+          elif [ -n "$PROJECT_ID" ]; then ARGS+=(--project_id "$PROJECT_ID")
+          elif [ -n "$COUNTRY_ID" ]; then ARGS+=(--country_id "$COUNTRY_ID")
+          else                            ARGS+=(--project_id "biohackathon-2025")
           fi
 
-          echo "REPORT_PATH=$REPORT_PATH" >> $GITHUB_ENV
+          REPORT_PATH=$(python iNotWiki.py "${ARGS[@]}")
+          echo "report_path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload generated report as artifact
         uses: actions/upload-artifact@v4
@@ -65,23 +64,40 @@ jobs:
           path: reports/issue-${{ github.event.issue.number }}/
 
       - name: Commit report folder to repository
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          git config user.name "github-actions[bot]"
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add reports/issue-${{ github.event.issue.number }}
-          git commit -m "Add report for issue #${{ github.event.issue.number }}" || echo "No changes to commit"
-          git push
+          git add "reports/issue-${ISSUE_NUMBER}"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Add report for issue #${ISSUE_NUMBER}"
+            git push
+          fi
 
       - name: Post Markdown report as issue comment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPORT_PATH: ${{ steps.run.outputs.report_path }}
         run: |
-          if [ -f "$REPORT_PATH" ]; then
-            COMMENT_BODY=$(cat "$REPORT_PATH" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-              -d "{\"body\": \"$COMMENT_BODY\"}"
-          else
-            echo "❌ No report file found. Skipping comment."
+          set -euo pipefail
+          if [ ! -f "$REPORT_PATH" ]; then
+            echo "No report file at $REPORT_PATH; skipping comment."
+            exit 0
           fi
+
+          # GitHub comment limit is 65 536 chars; truncate with a pointer to the file.
+          MAX=60000
+          BODY=$(head -c "$MAX" "$REPORT_PATH")
+          if [ "$(wc -c < "$REPORT_PATH")" -gt "$MAX" ]; then
+            SUFFIX=$(printf '\n\n%s\n_Report truncated. Full file: `%s` in this repository._' '---' "$REPORT_PATH")
+            BODY="${BODY}${SUFFIX}"
+          fi
+
+          jq -n --arg body "$BODY" '{body: $body}' \
+            | gh api -X POST "repos/${REPO}/issues/${ISSUE_NUMBER}/comments" --input -
