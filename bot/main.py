@@ -123,12 +123,31 @@ async def is_member(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
 
 async def cmd_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "iNotListed bot.\n\n"
-        "Usage:\n"
-        "  /wikiblitz <project_id_or_slug> [lang=en,nl] [accept=wikidata,gbif]\n\n"
-        "Example:\n"
-        "  /wikiblitz biohackathon-2025 lang=en,nl\n\n"
-        "Access: members of the configured Telegram group(s)."
+        "🌱 <b>iNotListed bot</b> — finds missing Wikipedia articles for an "
+        "iNaturalist project, so a WikiProject Biodiversity wikiblitz can target "
+        "what's actually missing.\n\n"
+        "<b>What it does</b>\n"
+        "Given an iNaturalist project (slug or numeric id), the bot:\n"
+        "  1. fetches every observation,\n"
+        "  2. looks up each taxon on Wikidata,\n"
+        "  3. checks whether a Wikipedia article exists in your chosen languages,\n"
+        "  4. replies with a summary + a PDF report listing the gaps.\n\n"
+        "<b>How to use</b> (members of the configured Telegram group(s)):\n"
+        "<code>/wikiblitz &lt;project&gt; [lang=en,nl,…] [accept=wikidata,gbif]</code>\n\n"
+        "<b>Examples</b>\n"
+        "  <code>/wikiblitz biohackathon-2025</code>\n"
+        "  <code>/wikiblitz datos-vivos-gb32-bogota-2025 lang=en,es,pt</code>\n\n"
+        "<b>Arguments</b>\n"
+        "• <code>project</code> — iNaturalist project slug or numeric id\n"
+        "• <code>lang=</code> — comma-separated Wikipedia language codes "
+        "(default: en,es,ja,ar,nl,pt,fr)\n"
+        "• <code>accept=</code> — reserved for upcoming filters\n\n"
+        "Big projects can take a few minutes. You'll get a ⏳ ack first; "
+        "the summary + PDF follow when the run finishes.\n\n"
+        "Source &amp; issues: "
+        "https://codeberg.org/wikiproject-biodiversity/iNotListed",
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
     )
 
 
