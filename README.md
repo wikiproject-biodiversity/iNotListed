@@ -1,3 +1,5 @@
+**English** · [Français](README.fr.md) · [Español](README.es.md) · [日本語](README.ja.md) · [മലയാളം](README.ml.md) · [Igbo](README.ig.md) · [Dagbanli](README.dag.md)
+
 # iNotWiki: Missing Wikipedia Articles CLI Tool
 
 A command-line tool to find **missing Wikipedia articles** for biological taxa using
