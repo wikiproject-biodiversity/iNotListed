@@ -201,6 +201,20 @@ async def cmd_wikiblitz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await ack.edit_text(f"❌ Error: {exc}")
         return
 
+    if summary.get("total_observations", 0) == 0:
+        await ack.edit_text(
+            f"⚠️ <b>No observations found</b> for <code>{html.escape(project)}</code>.\n\n"
+            "Possible causes:\n"
+            "• the project_id / slug is misspelled,\n"
+            "• the project doesn't exist on iNaturalist,\n"
+            "• the project exists but currently has no observations.\n\n"
+            "Open <code>https://www.inaturalist.org/projects/" + html.escape(project) + "</code> "
+            "in a browser to verify.",
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
+        return
+
     try:
         await ack.edit_text(format_summary(summary), parse_mode=ParseMode.HTML)
     except Exception:  # noqa: BLE001 - last-ditch fallback
